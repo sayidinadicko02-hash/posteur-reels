@@ -1,0 +1,47 @@
+name: Posteur de Reels
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"     # vérifie toutes les 10 min ; publie toutes les 30 min
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Publier tout de suite (ignore les 30 min)"
+        default: "0"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: posteur
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - name: Publier le prochain Reel
+        env:
+          DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
+          DROPBOX_APP_SECRET: ${{ secrets.DROPBOX_APP_SECRET }}
+          DROPBOX_REFRESH_TOKEN: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GH_REPO: ${{ github.repository }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FORCE_RUN: ${{ github.event.inputs.force }}
+        run: python posteur.py
+      - name: Sauvegarder l'état
+        run: |
+          git config user.name "posteur-bot"
+          git config user.email "posteur-bot@users.noreply.github.com"
+          git add state.json || true
+          git commit -m "État posteur" || echo "Rien à sauvegarder"
+          git push || true
