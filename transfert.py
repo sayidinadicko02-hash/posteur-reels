@@ -48,4 +48,9 @@ def main():
     tg(f"📥 {len(videos)} vidéo(s) déposée(s) dans Dropbox / A_POSTER. Publication automatique toutes les 30 min.")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"::error::{e}", flush=True)   # message visible dans le résumé GitHub
+        tg(f"❌ {os.path.basename(__file__)} : {e}"[:3500])
+        raise

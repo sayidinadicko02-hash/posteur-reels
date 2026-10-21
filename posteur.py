@@ -176,4 +176,9 @@ def main():
        (f"Encore {restants} vidéo(s), prochaine dans ~{ECART_MINUTES} min." if restants else "🎉 Lot terminé !"))
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"::error::{e}", flush=True)   # message visible dans le résumé GitHub
+        tg(f"❌ {os.path.basename(__file__)} : {e}"[:3500])
+        raise
