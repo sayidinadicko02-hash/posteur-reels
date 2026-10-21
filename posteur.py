@@ -37,9 +37,11 @@ def tg(text):
 # ---------- Dropbox ----------
 def dbx_token():
     r = requests.post("https://api.dropboxapi.com/oauth2/token",
-                      data={"grant_type": "refresh_token", "refresh_token": os.environ["DROPBOX_REFRESH_TOKEN"]},
-                      auth=(os.environ["DROPBOX_APP_KEY"], os.environ["DROPBOX_APP_SECRET"]), timeout=30)
-    r.raise_for_status()
+                      data={"grant_type": "refresh_token", "refresh_token": os.environ["DROPBOX_REFRESH_TOKEN"].strip()},
+                      auth=(os.environ["DROPBOX_APP_KEY"].strip(), os.environ["DROPBOX_APP_SECRET"].strip()), timeout=30)
+    if not r.ok:
+        # invalid_client = App key ou App secret faux ; invalid_grant = refresh token faux
+        raise RuntimeError(f"Dropbox refuse la connexion ({r.status_code}) : {r.text[:300]}")
     return r.json()["access_token"]
 
 def dbx(tok, route, payload):
@@ -156,7 +158,7 @@ def main():
         tg("⚠️ Posteur de Reels : pas de description.txt dans A_POSTER, je publie sans description.")
 
     lien = dbx(tok_dbx, "files/get_temporary_link", {"path": v["path_display"]})["link"]
-    ig_tok = renouveler_jeton(os.environ["IG_TOKEN"], state)
+    ig_tok = renouveler_jeton(os.environ["IG_TOKEN"].strip(), state)
     try:
         url = publier_reel(ig_tok, lien, caption)
     except Exception as e:
@@ -180,5 +182,5 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         print(f"::error::{e}", flush=True)   # message visible dans le résumé GitHub
-        tg(f"❌ {os.path.basename(__file__)} : {e}"[:3500])
+        tg(f"❌ Posteur de Reels : {e}"[:3500])
         raise
