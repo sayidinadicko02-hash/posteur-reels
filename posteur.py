@@ -10,12 +10,14 @@ Secrets requis : DROPBOX_APP_KEY, DROPBOX_APP_SECRET, DROPBOX_REFRESH_TOKEN,
 Secret optionnel : GH_PAT (pour renouveler tout seul le jeton Instagram)
 """
 import os, json, time, datetime, subprocess
+from zoneinfo import ZoneInfo
 import requests
 
 # ---------------- RÉGLAGES ----------------
 DOSSIER_A_POSTER = "/A_POSTER"
 DOSSIER_ERREURS = "/ERREURS"
 ECART_MINUTES = 30            # temps entre deux publications
+HEURES_PUBLICATION = (9, 23)  # publie seulement entre 9 h et 23 h (heure de Paris)
 IG_VERSION = "v26.0"
 EXTENSIONS = (".mp4", ".mov")
 # ------------------------------------------
@@ -136,6 +138,9 @@ def renouveler_jeton(tok, state):
 def main():
     state = json.load(open(STATE_FILE)) if os.path.exists(STATE_FILE) else {}
     now = datetime.datetime.now(datetime.timezone.utc)
+    paris = now.astimezone(ZoneInfo("Europe/Paris"))
+    if not (HEURES_PUBLICATION[0] <= paris.hour < HEURES_PUBLICATION[1]) and os.environ.get("FORCE_RUN") != "1":
+        log(f"Il est {paris:%H:%M} à Paris : on attend {HEURES_PUBLICATION[0]} h pour publier."); return
     last = state.get("last_post")
     if last and os.environ.get("FORCE_RUN") != "1":
         ecoule = (now - datetime.datetime.fromisoformat(last)).total_seconds() / 60
