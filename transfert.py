@@ -45,7 +45,7 @@ def main():
         print("Envoi :", name, flush=True)
         upload(tok, f, f"{DEST}/{name}")
     videos = [f for f in files if f.lower().endswith((".mp4", ".mov"))]
-    tg(f"📥 {len(videos)} vidéo(s) déposée(s) dans Dropbox / A_POSTER. Publication automatique toutes les 30 min.")
+    tg(f"📥 {len(videos)} vidéo(s) déposée(s) dans Dropbox / A_POSTER. Publication automatique toutes les 10 min.")
 
 if __name__ == "__main__":
     try:
