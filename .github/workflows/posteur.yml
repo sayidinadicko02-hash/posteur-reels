@@ -2,7 +2,7 @@ name: Posteur de Reels
 
 on:
   schedule:
-    - cron: "*/10 * * * *"     # vérifie toutes les 10 min ; publie toutes les 30 min
+    - cron: "*/10 * * * *"     # vérifie toutes les 10 min ; publie toutes les 10 min
   workflow_dispatch:
     inputs:
       force:

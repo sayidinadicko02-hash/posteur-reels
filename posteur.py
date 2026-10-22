@@ -2,8 +2,8 @@
 Posteur de Reels : Dropbox -> Instagram (+ notification Telegram)
 Tourne sur GitHub Actions toutes les 10 minutes.
 Dépose tes hooks + description.txt dans le dossier Dropbox /A_POSTER :
-le script publie une vidéo toutes les 30 minutes, puis la SUPPRIME de Dropbox
-(pour ne pas saturer ton espace). En cas d'échec, la vidéo est gardée dans /ERREURS.
+le script publie une vidéo toutes les 10 minutes, puis la RANGE dans /PUBLIES
+(rien n'est supprimé). En cas d'échec, la vidéo est gardée dans /ERREURS.
 
 Secrets requis : DROPBOX_APP_KEY, DROPBOX_APP_SECRET, DROPBOX_REFRESH_TOKEN,
                  IG_TOKEN, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
@@ -16,7 +16,8 @@ import requests
 # ---------------- RÉGLAGES ----------------
 DOSSIER_A_POSTER = "/A_POSTER"
 DOSSIER_ERREURS = "/ERREURS"
-ECART_MINUTES = 30            # temps entre deux publications
+DOSSIER_PUBLIES = "/PUBLIES"
+ECART_MINUTES = 10            # temps entre deux publications
 HEURES_PUBLICATION = (0, 24)  # plage horaire de publication (heure de Paris) ; (0, 24) = à toute heure
 IG_VERSION = "v26.0"
 EXTENSIONS = (".mp4", ".mov")
@@ -172,11 +173,12 @@ def main():
         tg(f"❌ {v['name']} n'a pas pu être publié (rangé dans ERREURS).\n{e}")
         state["last_post"] = now.isoformat(); json.dump(state, open(STATE_FILE, "w")); return
 
-    dbx_delete(tok_dbx, v["path_display"])            # vidéo publiée -> supprimée de Dropbox
-    if perso: dbx_delete(tok_dbx, perso)
+    dbx_mkdir(tok_dbx, DOSSIER_PUBLIES)
+    dbx_move(tok_dbx, v["path_display"], DOSSIER_PUBLIES)   # vidéo publiée -> rangée dans PUBLIES
+    if perso: dbx_move(tok_dbx, perso, DOSSIER_PUBLIES)
     restants = len(videos) - 1
     if restants == 0 and desc_path and not perso:
-        dbx_delete(tok_dbx, desc_path)                 # lot terminé : on supprime aussi la description
+        dbx_move(tok_dbx, desc_path, DOSSIER_PUBLIES)      # lot terminé : on range aussi la description
     state["last_post"] = now.isoformat()
     json.dump(state, open(STATE_FILE, "w"))
     tg(f"✅ {v['name']} publié sur Instagram.\n{url}\n" +
