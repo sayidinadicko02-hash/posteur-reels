@@ -1,0 +1,17 @@
+name: musique
+on:
+  push:
+    branches: [musique]
+permissions:
+  contents: write
+jobs:
+  dl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          mkdir -p musique
+          curl -fsSL -o "musique/sneaky_snitch.mp3" "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Sneaky%20Snitch.mp3"
+          ls -la musique
+          git config user.name bot; git config user.email bot@example.com
+          git add musique && git commit -m "musique" && git push
