@@ -136,23 +136,23 @@ def renouveler_jeton(tok, state):
         log("Renouvellement du jeton KO :", e)
         return tok
 
-def main():
-    state = json.load(open(STATE_FILE)) if os.path.exists(STATE_FILE) else {}
+def une_fois(state):
+    """Publie au plus une vidéo. Renvoie le nombre de vidéos restantes (0 = rien à faire)."""
     now = datetime.datetime.now(datetime.timezone.utc)
     paris = now.astimezone(ZoneInfo("Europe/Paris"))
     if not (HEURES_PUBLICATION[0] <= paris.hour < HEURES_PUBLICATION[1]) and os.environ.get("FORCE_RUN") != "1":
-        log(f"Il est {paris:%H:%M} à Paris : on attend {HEURES_PUBLICATION[0]} h pour publier."); return
+        log(f"Il est {paris:%H:%M} à Paris : on attend {HEURES_PUBLICATION[0]} h pour publier."); return 0
     last = state.get("last_post")
     if last and os.environ.get("FORCE_RUN") != "1":
         ecoule = (now - datetime.datetime.fromisoformat(last)).total_seconds() / 60
         if ecoule < ECART_MINUTES - 3:
-            log(f"Dernière publication il y a {ecoule:.0f} min, on attend."); return
+            log(f"Dernière publication il y a {ecoule:.0f} min, on attend."); return -1
 
     tok_dbx = dbx_token()
     fichiers = dbx_list(tok_dbx, DOSSIER_A_POSTER)
     videos = sorted([f for f in fichiers if f["name"].lower().endswith(EXTENSIONS)], key=lambda f: f["name"].lower())
     if not videos:
-        log("Rien à publier."); return
+        log("Rien à publier."); return 0
 
     v = videos[0]
     base = os.path.splitext(v["path_display"])[0]
@@ -171,7 +171,7 @@ def main():
         log("Échec :", e)
         dbx_mkdir(tok_dbx, DOSSIER_ERREURS); dbx_move(tok_dbx, v["path_display"], DOSSIER_ERREURS)
         tg(f"❌ {v['name']} n'a pas pu être publié (rangé dans ERREURS).\n{e}")
-        state["last_post"] = now.isoformat(); json.dump(state, open(STATE_FILE, "w")); return
+        state["last_post"] = now.isoformat(); json.dump(state, open(STATE_FILE, "w")); return len(videos) - 1
 
     dbx_mkdir(tok_dbx, DOSSIER_PUBLIES)
     dbx_move(tok_dbx, v["path_display"], DOSSIER_PUBLIES)   # vidéo publiée -> rangée dans PUBLIES
@@ -183,6 +183,27 @@ def main():
     json.dump(state, open(STATE_FILE, "w"))
     tg(f"✅ {v['name']} publié sur Instagram.\n{url}\n" +
        (f"Encore {restants} vidéo(s), prochaine dans ~{ECART_MINUTES} min." if restants else "🎉 Lot terminé !"))
+    return restants
+
+DUREE_MAX_MIN = 330   # un passage GitHub reste actif au plus 5 h 30 et publie toute la file
+
+def main():
+    """GitHub ne lance pas les tâches planifiées à l'heure (souvent 30-60 min de retard) :
+    une fois lancé, le script reste actif et publie une vidéo toutes les ECART_MINUTES
+    jusqu'à ce que /A_POSTER soit vide."""
+    debut = time.time()
+    state = json.load(open(STATE_FILE)) if os.path.exists(STATE_FILE) else {}
+    while True:
+        restants = une_fois(state)
+        if restants == 0:
+            return
+        os.environ.pop("FORCE_RUN", None)
+        if (time.time() - debut) / 60 > DUREE_MAX_MIN - ECART_MINUTES:
+            log("Durée max atteinte, le prochain passage continuera."); return
+        last = datetime.datetime.fromisoformat(state["last_post"])
+        attente = ECART_MINUTES * 60 - (datetime.datetime.now(datetime.timezone.utc) - last).total_seconds()
+        log(f"Prochaine publication dans {max(0, attente)/60:.1f} min.")
+        time.sleep(max(5, attente))
 
 if __name__ == "__main__":
     try:

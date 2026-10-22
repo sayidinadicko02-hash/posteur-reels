@@ -2,11 +2,14 @@ name: Posteur de Reels
 
 on:
   schedule:
-    - cron: "*/10 * * * *"     # vérifie toutes les 10 min ; publie toutes les 10 min
+    - cron: "*/10 * * * *"     # relance de secours ; un passage publie toute la file (1 vidéo / 10 min)
+  push:
+    branches: [main]
+    paths: [posteur.py, .github/workflows/posteur.yml]
   workflow_dispatch:
     inputs:
       force:
-        description: "Publier tout de suite (ignore les 30 min)"
+        description: "Publier tout de suite (ignore l'écart de 10 min)"
         default: "0"
 
 permissions:
@@ -19,7 +22,7 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
