@@ -2,7 +2,7 @@
 Posteur de Reels : Dropbox -> Instagram (+ notification Telegram)
 Tourne sur GitHub Actions toutes les 10 minutes.
 Dépose tes hooks + description.txt dans le dossier Dropbox /A_POSTER :
-le script publie une vidéo toutes les 10 minutes, puis la RANGE dans /PUBLIES
+le script publie une vidéo toutes les 20 minutes, puis la RANGE dans /PUBLIES
 (rien n'est supprimé). En cas d'échec, la vidéo est gardée dans /ERREURS.
 
 Secrets requis : DROPBOX_APP_KEY, DROPBOX_APP_SECRET, DROPBOX_REFRESH_TOKEN,
@@ -17,7 +17,7 @@ import requests
 DOSSIER_A_POSTER = "/A_POSTER"
 DOSSIER_ERREURS = "/ERREURS"
 DOSSIER_PUBLIES = "/PUBLIES"
-ECART_MINUTES = 10            # temps entre deux publications
+ECART_MINUTES = 20            # temps entre deux publications
 HEURES_PUBLICATION = (0, 24)  # plage horaire de publication (heure de Paris) ; (0, 24) = à toute heure
 IG_VERSION = "v26.0"
 EXTENSIONS = (".mp4", ".mov")

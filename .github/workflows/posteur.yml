@@ -2,14 +2,14 @@ name: Posteur de Reels
 
 on:
   schedule:
-    - cron: "*/10 * * * *"     # relance de secours ; un passage publie toute la file (1 vidéo / 10 min)
+    - cron: "*/10 * * * *"     # relance de secours ; un passage publie toute la file (1 vidéo / 20 min)
   push:
     branches: [main]
     paths: [posteur.py, .github/workflows/posteur.yml]
   workflow_dispatch:
     inputs:
       force:
-        description: "Publier tout de suite (ignore l'écart de 10 min)"
+        description: "Publier tout de suite (ignore l'écart de 20 min)"
         default: "0"
 
 permissions:
