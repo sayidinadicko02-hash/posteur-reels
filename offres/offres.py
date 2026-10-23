@@ -49,7 +49,7 @@ def chercher(mots, lieu, periode):
            + urllib.parse.urlencode({"keywords": mots, "location": lieu, "f_TPR": periode, "f_JT": "I", "start": 0}))
     r = requests.get(url, headers=UA, timeout=30)
     if r.status_code != 200:
-        log("LinkedIn", r.status_code, mots, lieu); return []
+        log(f"::warning::LinkedIn {r.status_code} {mots} {lieu}"); return []
     soup = BeautifulSoup(r.text, "html.parser"); out = []
     for li in soup.select("li"):
         div = li.select_one("[data-entity-urn]")
@@ -137,7 +137,7 @@ def verification(st, premiere):
         for o in chercher(mots, lieu, periode):
             if o["id"] not in vues: nouvelles[o["id"]] = o
         time.sleep(random.uniform(2, 5))
-    log(f"{len(nouvelles)} nouvelle(s) offre(s) sur {len(lot)} recherches")
+    log(f"::notice::{len(nouvelles)} nouvelle(s) offre(s) sur {len(lot)} recherches")
     traitees = 0; changed = False
     for o in list(nouvelles.values()):
         if traitees >= MAX_OFFRES: break
@@ -147,7 +147,7 @@ def verification(st, premiere):
         try:
             a = adapter(o, desc)
         except Exception as ex:
-            log("Gemini KO", ex); st["vues"].remove(o["id"]); break
+            log(f"::warning::Gemini KO {ex}"); st["vues"].remove(o["id"]); break
         traitees += 1
         if not a.get("pertinent"):
             log("Hors sujet :", o["titre"]); continue
@@ -158,7 +158,7 @@ def verification(st, premiere):
                 (D.lettre_html(a["lettre"], o["entreprise"], o["titre"], ville, cp, pays, a.get("langue", "fr")), lm)])
         tg_msg(f"🎯 {o['titre']}\n🏢 {o['entreprise']}\n📍 {o['lieu']}\n🧩 {a.get('domaine','')}\n\n👉 Postuler : {o['lien']}")
         tg_doc(cv, "CV adapté"); tg_doc(lm, "Lettre de motivation")
-        log("Envoyé :", o["titre"], "-", o["entreprise"])
+        log(f"::notice::Envoyé : {o['titre']} - {o['entreprise']}")
     sauver(st)
 
 def main():
@@ -169,7 +169,7 @@ def main():
         try:
             verification(st, premiere)
         except Exception as ex:
-            log("Erreur :", ex)
+            log(f"::error::Erreur : {ex}")
         premiere = False
         if (time.time() - t0) / 60 > DUREE_MAX_MIN - ECART_MIN: return
         time.sleep(ECART_MIN * 60)
