@@ -13,7 +13,7 @@ import os, json, time, datetime, subprocess
 from zoneinfo import ZoneInfo
 import requests
 
-# ---------------- RÉGLAGES ----------------
+# ---------------- RÉGLAGES (modifiables) ----------------
 DOSSIER_A_POSTER = "/A_POSTER"
 DOSSIER_ERREURS = "/ERREURS"
 DOSSIER_PUBLIES = "/PUBLIES"
