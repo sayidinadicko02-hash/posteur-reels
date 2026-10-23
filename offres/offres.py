@@ -20,6 +20,7 @@ RECHERCHES = [
 LIEUX = ["France"]
 PAR_PASSAGE = 6          # recherches LinkedIn par vérification (on tourne dans la liste)
 MAX_OFFRES = 6           # offres traitées max par vérification (limite gratuite Gemini)
+MAX_PAR_HEURE = 5        # liens envoyés max sur 1 heure glissante
 ECART_MIN = 10           # minutes entre deux vérifications
 DUREE_MAX_MIN = 330
 DISPO = "1er novembre 2026"
@@ -125,10 +126,12 @@ def adapter(o, desc):
 
 # ---------- état ----------
 def charger():
-    return json.load(open(VUES)) if os.path.exists(VUES) else {"vues": [], "tour": 0}
+    st = json.load(open(VUES)) if os.path.exists(VUES) else {}
+    st.setdefault("vues", []); st.setdefault("tour", 0); st.setdefault("envois", []); st.setdefault("cles", [])
+    return st
 
 def sauver(st):
-    st["vues"] = st["vues"][-5000:]
+    st["vues"] = st["vues"][-5000:]; st["cles"] = st["cles"][-5000:]
     json.dump(st, open(VUES, "w"))
     subprocess.run("git add offres/vues.json && git commit -qm 'Offres vues' && git pull -q --rebase && git push -q",
                    shell=True, cwd=os.path.dirname(ICI))
@@ -136,21 +139,27 @@ def sauver(st):
 def nettoie(s): return re.sub(r"[^A-Za-z0-9]+", "_", s)[:40].strip("_")
 
 def verification(st, premiere):
-    periode = "r86400" if premiere else "r3600"
+    periode = "r86400"                                   # offres publiées dans les dernières 24 h
+    maintenant = time.time()
+    st["envois"] = [t for t in st["envois"] if maintenant - t < 3600]
+    quota = MAX_PAR_HEURE - len(st["envois"])
+    if quota <= 0:
+        log(f"::notice::Déjà {MAX_PAR_HEURE} liens envoyés cette heure, on attend."); return
     combos = [(m, l) for m in RECHERCHES for l in LIEUX]
     debut = st.get("tour", 0) % len(combos)
     lot = [combos[(debut + k) % len(combos)] for k in range(PAR_PASSAGE)]
     st["tour"] = debut + PAR_PASSAGE
-    vues = set(st["vues"]); nouvelles = {}
+    vues = set(st["vues"]); cles = set(st["cles"]); nouvelles = {}
     for mots, lieu in lot:
         for o in chercher(mots, lieu, periode):
-            if o["id"] not in vues: nouvelles[o["id"]] = o
+            cle = (o["titre"] + "|" + o["entreprise"]).lower()   # même offre republiée sous un autre numéro
+            if o["id"] not in vues and cle not in cles: nouvelles[o["id"]] = o
         time.sleep(random.uniform(2, 5))
     log(f"::notice::{len(nouvelles)} nouvelle(s) offre(s) sur {len(lot)} recherches")
-    traitees = 0; changed = False
+    traitees = 0; envoyes = 0
     for o in list(nouvelles.values()):
-        if traitees >= MAX_OFFRES: break
-        st["vues"].append(o["id"]); changed = True
+        if traitees >= MAX_OFFRES or envoyes >= quota: break
+        st["vues"].append(o["id"])
         desc = description(o["id"])
         if not desc: continue
         time.sleep(7)                                   # reste sous la limite gratuite par minute
@@ -172,6 +181,7 @@ def verification(st, premiere):
                f"🏠 Adresse à indiquer (comme sur le CV) :\n• Ville : {ville or '-'}\n• Code postal : {cp or '-'}\n"
                f"• Département : {a.get('departement','') or '-'}\n• Pays : {pays or '-'}\n\n👉 Postuler : {o['lien']}")
         tg_doc(cv, "CV adapté"); tg_doc(lm, "Lettre de motivation")
+        st["envois"].append(time.time()); st["cles"].append((o["titre"] + "|" + o["entreprise"]).lower()); envoyes += 1
         log(f"::notice::Envoyé : {o['titre']} - {o['entreprise']}")
     sauver(st)
 
