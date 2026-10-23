@@ -10,16 +10,17 @@ import documents as D
 
 # ---------------- RÉGLAGES ----------------
 RECHERCHES = [
-    "stage conception numérique", "stage FPGA", "stage ASIC", "stage VLSI", "stage microélectronique",
-    "stage conception analogique", "stage circuits intégrés", "stage vérification RTL", "stage systèmes embarqués",
-    "stage logiciel embarqué", "stage intelligence artificielle embarquée", "stage vision par ordinateur",
-    "stage télécommunications", "stage semi-conducteurs", "stage fin d'études électronique",
-    "FPGA internship", "ASIC design internship", "analog IC design internship", "embedded systems internship",
-    "digital design internship", "machine learning hardware internship", "semiconductor internship",
+    "stage microélectronique", "stage conception numérique", "stage conception ASIC", "stage FPGA",
+    "stage VHDL", "stage Verilog", "stage VLSI", "stage conception analogique", "stage circuits intégrés",
+    "stage vérification numérique", "stage layout", "stage semi-conducteurs", "stage design RTL",
+    "stage électronique embarquée", "stage systèmes embarqués électronique", "stage hardware",
+    "stage radiofréquence", "stage traitement du signal FPGA", "stage IA embarquée FPGA",
+    "FPGA internship", "ASIC internship", "analog design internship", "digital design internship",
+    "RTL design internship", "semiconductor internship", "hardware engineer internship",
 ]
 LIEUX = ["France"]
 PAR_PASSAGE = 6          # recherches LinkedIn par vérification (on tourne dans la liste)
-MAX_OFFRES = 6           # offres traitées max par vérification (limite gratuite Gemini)
+MAX_OFFRES = 8           # offres traitées max par vérification (limite gratuite Gemini)
 MAX_PAR_HEURE = 5        # liens envoyés max sur 1 heure glissante
 ECART_MIN = 10           # minutes entre deux vérifications
 DUREE_MAX_MIN = 330
@@ -111,7 +112,8 @@ Ses projets : microprocesseur 8 bits RISC conçu en groupe (puce), optimisation 
 Ses expériences : réparateur d'appareils électroniques (BFK Net Provence), stage chez AIME Toulouse (fabrication de cellules photovoltaïques), professeur particulier, serveur.
 
 Réponds UNIQUEMENT en JSON avec ces clés :
-- "pertinent": true si c'est un stage (stage / internship / PFE / fin d'études, pas un CDI, pas une alternance) lié à l'électronique, la microélectronique, FPGA/ASIC/VLSI, l'analogique, l'embarqué, les télécoms, l'IA ou le logiciel technique ; sinon false.
+- "score": note de 0 à 10 de l'adéquation entre l'offre et son profil de MICROÉLECTRONIQUE. 9-10 = conception numérique/analogique, ASIC, FPGA, VHDL/Verilog, VLSI, vérification RTL, layout, semi-conducteurs, circuits intégrés. 7-8 = électronique embarquée proche du matériel (microcontrôleurs, firmware, PCB, RF, traitement du signal sur FPGA, IA embarquée sur NPU/FPGA). 0-4 = logiciel pur, web, UX/UI, data, IT, cloud, mécanique, chimie, marketing, commercial, ou tout ce qui n'est pas de l'électronique.
+- "pertinent": true seulement si c'est un STAGE (stage / internship / PFE / fin d'études ; pas CDI, CDD, alternance ni apprentissage) ET score >= 7 ; sinon false.
 - "langue": "fr" si l'offre est en français, sinon "en".
 - "domaine": le domaine du stage en quelques mots, repris de l'offre (ex : "conception numérique ASIC/FPGA").
 - "ville": la ville de l'offre ; "code_postal": son code postal (5 chiffres en France ; si seul le département est donné, celui de la préfecture ; code postal local si étranger, sinon "") ; "departement": en France "Nom (numéro)" ex. "Loiret (45)", à l'étranger la région/l'état ; "pays": le pays.
@@ -135,6 +137,15 @@ def sauver(st):
     json.dump(st, open(VUES, "w"))
     subprocess.run("git add offres/vues.json && git commit -qm 'Offres vues' && git pull -q --rebase && git push -q",
                    shell=True, cwd=os.path.dirname(ICI))
+
+MOTS_DOMAINE = ["microélectron", "microelectron", "asic", "fpga", "vhdl", "verilog", "systemverilog", "vlsi", "rtl",
+    "analog", "analogique", "circuit", "semi-conduct", "semiconduct", "silicium", "silicon", "layout", "cadence", "synopsys",
+    "virtuoso", "innovus", "électroniq", "electroniq", "electronic", "hardware", "embarqu", "embedded", "microcontr",
+    "firmware", " rf ", "radiofréquence", "radio-fréquence", "signal", "soc", "chip", "puce", "pcb", "uvm"]
+
+def dans_domaine(o, desc):
+    t = (" " + o["titre"] + " " + desc + " ").lower()
+    return sum(m in t for m in MOTS_DOMAINE) >= 2
 
 def nettoie(s): return re.sub(r"[^A-Za-z0-9]+", "_", s)[:40].strip("_")
 
@@ -162,13 +173,15 @@ def verification(st, premiere):
         st["vues"].append(o["id"])
         desc = description(o["id"])
         if not desc: continue
+        if not dans_domaine(o, desc):
+            log("Hors domaine (mots-clés) :", o["titre"]); continue
         time.sleep(7)                                   # reste sous la limite gratuite par minute
         try:
             a = adapter(o, desc)
         except Exception as ex:
             log(f"::warning::Gemini KO {ex}"); st["vues"].remove(o["id"]); break
         traitees += 1
-        if not a.get("pertinent"):
+        if not a.get("pertinent") or int(a.get("score", 0) or 0) < 7:
             log("Hors sujet :", o["titre"]); continue
         if "france" not in (a.get("pays", "") + " " + o["lieu"]).lower():
             log("Hors France :", o["titre"], o["lieu"]); continue
@@ -177,7 +190,7 @@ def verification(st, premiere):
         ville, cp, pays = a.get("ville", ""), a.get("code_postal", ""), a.get("pays", "")
         D.pdfs([(D.cv_html(a["resume"], a["competences"], ville, cp, pays), cv),
                 (D.lettre_html(a["lettre"], o["entreprise"], o["titre"], ville, cp, pays, a.get("langue", "fr")), lm)])
-        tg_msg(f"🎯 {o['titre']}\n🏢 {o['entreprise']}\n📍 {o['lieu']}\n🧩 {a.get('domaine','')}\n\n"
+        tg_msg(f"🎯 {o['titre']}\n🏢 {o['entreprise']}\n📍 {o['lieu']}\n🧩 {a.get('domaine','')} (adéquation {a.get('score','?')}/10)\n\n"
                f"🏠 Adresse à indiquer (comme sur le CV) :\n• Ville : {ville or '-'}\n• Code postal : {cp or '-'}\n"
                f"• Département : {a.get('departement','') or '-'}\n• Pays : {pays or '-'}\n\n👉 Postuler : {o['lien']}")
         tg_doc(cv, "CV adapté"); tg_doc(lm, "Lettre de motivation")
