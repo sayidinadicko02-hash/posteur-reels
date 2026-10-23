@@ -104,7 +104,7 @@ Réponds UNIQUEMENT en JSON avec ces clés :
 - "pertinent": true si c'est un stage (stage / internship / PFE / fin d'études, pas un CDI, pas une alternance) lié à l'électronique, la microélectronique, FPGA/ASIC/VLSI, l'analogique, l'embarqué, les télécoms, l'IA ou le logiciel technique ; sinon false.
 - "langue": "fr" si l'offre est en français, sinon "en".
 - "domaine": le domaine du stage en quelques mots, repris de l'offre (ex : "conception numérique ASIC/FPGA").
-- "ville": la ville de l'offre ; "code_postal": son code postal (5 chiffres en France ; si seul le département est donné, celui de la préfecture ; "" si inconnu ou étranger) ; "pays": le pays.
+- "ville": la ville de l'offre ; "code_postal": son code postal (5 chiffres en France ; si seul le département est donné, celui de la préfecture ; code postal local si étranger, sinon "") ; "departement": en France "Nom (numéro)" ex. "Loiret (45)", à l'étranger la région/l'état ; "pays": le pays.
 - "resume": résumé du CV (4 à 5 phrases, dans la langue de l'offre), calé sur le profil recherché en reprenant ses mots-clés, terminant par : "Recherche un stage de fin d'études de 6 mois en <domaine>, disponible dès le {dispo}." (ou l'équivalent anglais).
 - "competences": 14 à 16 compétences courtes (moins de 45 caractères chacune), dans la langue de l'offre : d'abord EXACTEMENT les compétences, outils et langages demandés dans l'offre (même s'ils ne sont pas dans ses compétences de base), puis ses compétences de base les plus proches.
 - "lettre": une lettre de motivation de 4 paragraphes (tableau de chaînes), dans la langue de l'offre, sans formule d'appel ni signature : pourquoi cette entreprise et ce poste, ce qu'il apporte (en reliant ses projets et compétences aux missions), sa disponibilité dès le {dispo} pour 6 mois, demande d'entretien. Ton professionnel, concret, pas de phrases creuses.
@@ -156,7 +156,9 @@ def verification(st, premiere):
         ville, cp, pays = a.get("ville", ""), a.get("code_postal", ""), a.get("pays", "")
         D.pdfs([(D.cv_html(a["resume"], a["competences"], ville, cp, pays), cv),
                 (D.lettre_html(a["lettre"], o["entreprise"], o["titre"], ville, cp, pays, a.get("langue", "fr")), lm)])
-        tg_msg(f"🎯 {o['titre']}\n🏢 {o['entreprise']}\n📍 {o['lieu']}\n🧩 {a.get('domaine','')}\n\n👉 Postuler : {o['lien']}")
+        tg_msg(f"🎯 {o['titre']}\n🏢 {o['entreprise']}\n📍 {o['lieu']}\n🧩 {a.get('domaine','')}\n\n"
+               f"🏠 Adresse à indiquer (comme sur le CV) :\n• Ville : {ville or '-'}\n• Code postal : {cp or '-'}\n"
+               f"• Département : {a.get('departement','') or '-'}\n• Pays : {pays or '-'}\n\n👉 Postuler : {o['lien']}")
         tg_doc(cv, "CV adapté"); tg_doc(lm, "Lettre de motivation")
         log(f"::notice::Envoyé : {o['titre']} - {o['entreprise']}")
     sauver(st)
