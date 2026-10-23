@@ -17,7 +17,7 @@ RECHERCHES = [
     "FPGA internship", "ASIC design internship", "analog IC design internship", "embedded systems internship",
     "digital design internship", "machine learning hardware internship", "semiconductor internship",
 ]
-LIEUX = ["France", "European Union", "Switzerland", "Canada"]
+LIEUX = ["France"]
 PAR_PASSAGE = 6          # recherches LinkedIn par vérification (on tourne dans la liste)
 MAX_OFFRES = 6           # offres traitées max par vérification (limite gratuite Gemini)
 ECART_MIN = 10           # minutes entre deux vérifications
@@ -161,6 +161,8 @@ def verification(st, premiere):
         traitees += 1
         if not a.get("pertinent"):
             log("Hors sujet :", o["titre"]); continue
+        if "france" not in (a.get("pays", "") + " " + o["lieu"]).lower():
+            log("Hors France :", o["titre"], o["lieu"]); continue
         nom = f"{nettoie(o['entreprise'])}_{o['id']}"
         cv, lm = f"/tmp/CV_Sayidina_Dicko_{nom}.pdf", f"/tmp/Lettre_Sayidina_Dicko_{nom}.pdf"
         ville, cp, pays = a.get("ville", ""), a.get("code_postal", ""), a.get("pays", "")
