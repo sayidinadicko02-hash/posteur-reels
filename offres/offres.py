@@ -162,6 +162,8 @@ def verification(st, premiere):
     sauver(st)
 
 def main():
+    if not (os.environ.get("CV_TEL", "").strip() and os.environ.get("CV_EMAIL", "").strip()):
+        log("Secrets CV_TEL / CV_EMAIL manquants : on attend qu'ils soient ajoutés."); return
     t0 = time.time(); st = charger(); premiere = not st["vues"]
     while True:
         try:
