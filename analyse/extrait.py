@@ -6,7 +6,8 @@ os.makedirs("videos", exist_ok=True); meta = []
 for tag, lst in (("top", M[:12]), ("flop", M[-12:])):
     for k, m in enumerate(lst, 1):
         p = f"videos/{tag}{k:02d}_{m['id']}.mp4"
-        open(p, "wb").write(requests.get(m["media_url"], timeout=120).content)
+        open("/tmp/x.mp4", "wb").write(requests.get(m["media_url"], timeout=120).content)
+        os.system(f"ffmpeg -v error -y -i /tmp/x.mp4 -vf scale=360:-2 -c:v libx264 -crf 30 -preset fast -c:a aac -b:a 64k {p}")
         meta.append({"fichier": p, "id": m["id"], "date": m["timestamp"], "vues": m["insights"].get("views"), "watch": m["insights"].get("ig_reels_avg_watch_time"), "lien": m.get("permalink")})
 json.dump(meta, open("videos/meta.json", "w"), ensure_ascii=False, indent=1)
 print(f"::notice::{len(meta)} vidéos")

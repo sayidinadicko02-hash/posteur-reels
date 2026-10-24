@@ -10,12 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: pip install requests
+      - run: pip install requests && sudo apt-get install -y ffmpeg >/dev/null
       - env:
           IG_TOKEN: ${{ secrets.IG_TOKEN }}
         run: |
-          cd analyse && python collecte.py > /dev/null && python extrait.py
-          tar czf v.tgz videos && openssl rand -hex 32 > k.txt
+          set -x; cd analyse && python collecte.py > /dev/null && python extrait.py
+          tar czf v.tgz videos && ls -la v.tgz && openssl rand -hex 32 > k.txt
           openssl enc -aes-256-cbc -pbkdf2 -salt -in v.tgz -out v.tgz.enc -pass file:k.txt
           openssl pkeyutl -encrypt -pubin -inkey cle_publique.pem -in k.txt -out kv.enc
           rm -rf videos v.tgz k.txt data.json
