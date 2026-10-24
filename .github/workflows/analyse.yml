@@ -1,10 +1,12 @@
 name: Analyse du compte
 
 on:
+  schedule:
+    - cron: "17 6 * * 1"      # audit complet chaque lundi ~8h (Paris)
   workflow_dispatch:
   push:
     branches: [main]
-    paths: [analyse/collecte.py, .github/workflows/analyse.yml]
+    paths: [analyse/collecte.py, analyse/rapport.py, .github/workflows/analyse.yml]
 
 permissions:
   contents: write
@@ -15,17 +17,27 @@ concurrency:
 jobs:
   collecte:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install requests
+      - name: Installer
+        run: |
+          pip install requests playwright
+          sudo apt-get install -y ffmpeg fonts-liberation >/dev/null
+          python -m playwright install --with-deps chromium >/dev/null
       - name: Collecter les stats Instagram
         env:
           IG_TOKEN: ${{ secrets.IG_TOKEN }}
         run: cd analyse && python collecte.py
+      - name: Analyser et envoyer le rapport PDF sur Telegram
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: cd analyse && python rapport.py
       - name: Chiffrer (le repo est public) et enregistrer
         run: |
           cd analyse
