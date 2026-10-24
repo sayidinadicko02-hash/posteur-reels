@@ -1,0 +1,11 @@
+name: Test concurrents
+on:
+  push:
+    branches: [main]
+    paths: [analyse/test_concurrents.py, .github/workflows/test_concurrents.yml]
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install requests && python analyse/test_concurrents.py
