@@ -1,0 +1,37 @@
+name: Analyse du compte
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [analyse/collecte.py, .github/workflows/analyse.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: analyse
+
+jobs:
+  collecte:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - name: Collecter les stats Instagram
+        env:
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+        run: cd analyse && python collecte.py
+      - name: Chiffrer (le repo est public) et enregistrer
+        run: |
+          cd analyse
+          openssl rand -hex 32 > k.txt
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in data.json -out data.json.enc -pass file:k.txt
+          openssl pkeyutl -encrypt -pubin -inkey cle_publique.pem -in k.txt -out k.enc
+          rm -f k.txt data.json
+          git config user.name "analyse-bot"; git config user.email "analyse-bot@users.noreply.github.com"
+          git add data.json.enc k.enc && git commit -qm "Données d'analyse (chiffrées)" && git pull -q --rebase && git push -q
