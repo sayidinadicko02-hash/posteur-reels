@@ -1,0 +1,15 @@
+name: Test video Gemini
+on:
+  push:
+    branches: [main]
+    paths: [analyse/test_video.py, .github/workflows/test_video.yml]
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install requests
+      - env:
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: cd analyse && python collecte.py > /dev/null && python test_video.py
