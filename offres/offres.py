@@ -39,7 +39,7 @@ TG = f"https://api.telegram.org/bot{os.environ['TELEGRAM_BOT_TOKEN']}"
 CHAT = os.environ["TELEGRAM_CHAT_ID"]
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
       "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8"}
-MODELES = [os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest", "gemini-flash-lite-latest"]
+MODELES = [os.environ.get("GEMINI_MODEL") or "gemini-flash-latest", "gemini-flash-lite-latest"]
 
 def log(*a): print(*a, flush=True)
 

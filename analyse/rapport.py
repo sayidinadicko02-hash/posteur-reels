@@ -12,7 +12,7 @@ import requests
 
 PARIS = ZoneInfo("Europe/Paris")
 SANS_IA = os.environ.get("SANS_IA") == "1"
-MODELES = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"]
+MODELES = ["gemini-flash-latest", "gemini-flash-lite-latest"]
 LOTS_VIDEO = int(os.environ.get("LOTS_VIDEO", "6"))       # nb de lots dont on analyse les vidéos
 def log(*a): print(*a, flush=True)
 
