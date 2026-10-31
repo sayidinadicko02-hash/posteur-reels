@@ -16,6 +16,10 @@ MOBILITE = "Disponible dès le 1er novembre 2026 – Mobile partout en France"
 EXPERIENCE = [
     ("Réparateur d'appareils électroniques", "BFK Net Provence, Marseille", "Juillet 2025 à septembre 2025",
      ["Diagnostic de pannes et réparation d'appareils électroniques."]),
+    ("Stage Technicien Supérieur en Électronique", "Senelec, Dakar (Sénégal)", "Juin 2023 à août 2023",
+     ["Conception et test de circuits pour systèmes de distribution électrique.",
+      "Tests et diagnostics sur des équipements électroniques pour identifier et résoudre les dysfonctionnements.",
+      "Collaboration avec l'équipe d'ingénierie pour l'optimisation des performances des systèmes électroniques."]),
     ("Stagiaire", "AIME, Toulouse", "Stage",
      ["Assistance à la fabrication de cellules photovoltaïques."]),
     ("Professeur particulier", "Méthodik, Paris", "Octobre 2022 à juillet 2023",
