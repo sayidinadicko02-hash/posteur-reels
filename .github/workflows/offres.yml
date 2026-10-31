@@ -7,12 +7,16 @@ on:
     branches: [main]
     paths: [offres/offres.py, offres/documents.py, .github/workflows/offres.yml]
   workflow_dispatch:
+    inputs:
+      test:
+        description: "1 = renvoyer le CV adapté d'une offre déjà reçue (test)"
+        default: "0"
 
 permissions:
   contents: write
 
 concurrency:
-  group: offres
+  group: offres${{ github.event.inputs.test == '1' && '-test' || '' }}
   cancel-in-progress: false
 
 jobs:
@@ -36,6 +40,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           CV_TEL: ${{ secrets.CV_TEL }}
           CV_EMAIL: ${{ secrets.CV_EMAIL }}
+          TEST_CV: ${{ github.event.inputs.test }}
         run: |
           git config user.name "offres-bot"
           git config user.email "offres-bot@users.noreply.github.com"

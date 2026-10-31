@@ -259,7 +259,29 @@ def verification(st, premiere):
         log(f"::notice::Envoyé : {o['titre']} - {o['entreprise']}")
     sauver(st)
 
+def test_cv():
+    """Test : reprend une offre déjà envoyée sur Telegram et renvoie le CV adapté (format ATS)."""
+    st = charger(); cles = set(st["cles"])
+    for mots in RECHERCHES:
+        for o in chercher(mots, "France", "r2592000"):
+            if (o["titre"] + "|" + o["entreprise"]).lower() not in cles: continue
+            desc = description(o["id"])
+            if not desc: continue
+            a = adapter(o, desc)
+            nom = f"{nettoie(o['entreprise'])}_{o['id']}"
+            cv, lm = f"/tmp/CV_Sayidina_Dicko_{nom}.pdf", f"/tmp/Lettre_Sayidina_Dicko_{nom}.pdf"
+            ville, cp, pays = a.get("ville", ""), a.get("code_postal", ""), a.get("pays", "")
+            D.pdfs([(D.cv_html(a.get("resume"), a.get("competences"), ville, cp, pays, a.get("titre_cv") or o["titre"], a.get("experiences"), a.get("projets")), cv),
+                    (D.lettre_html(a["lettre"], o["entreprise"], o["titre"], ville, cp, pays, a.get("langue", "fr")), lm)])
+            tg_msg(f"🧪 TEST CV ATS (offre déjà reçue) : {o['titre']}\n🏢 {o['entreprise']}\n📍 {o['lieu']}\n👉 {o['lien']}")
+            tg_doc(cv, "CV adapté (format ATS)"); tg_doc(lm, "Lettre de motivation")
+            log(f"::notice::Test envoyé : {o['titre']} - {o['entreprise']}"); return
+        time.sleep(3)
+    log("::warning::Aucune offre déjà envoyée retrouvée sur LinkedIn")
+
 def main():
+    if os.environ.get("TEST_CV") == "1":
+        test_cv(); return
     if not (os.environ.get("CV_TEL", "").strip() and os.environ.get("CV_EMAIL", "").strip()):
         log("Secrets CV_TEL / CV_EMAIL manquants : on attend qu'ils soient ajoutés."); return
     t0 = time.time(); st = charger(); premiere = not st["vues"]
