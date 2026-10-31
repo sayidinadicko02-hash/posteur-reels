@@ -279,6 +279,16 @@ def test_cv():
         time.sleep(3)
     log("::warning::Aucune offre déjà envoyée retrouvée sur LinkedIn")
 
+def code_modifie():
+    """Vrai si offres.py / documents.py ont changé sur GitHub depuis le lancement (évite de tourner 5 h sur un vieux code)."""
+    racine = os.path.dirname(ICI)
+    try:
+        subprocess.run("git fetch -q origin main", shell=True, cwd=racine, timeout=60)
+        r = subprocess.run("git diff --quiet HEAD origin/main -- offres/offres.py offres/documents.py", shell=True, cwd=racine)
+        return r.returncode == 1
+    except Exception:
+        return False
+
 def main():
     if os.environ.get("TEST_CV") == "1":
         test_cv(); return
@@ -292,6 +302,8 @@ def main():
             log(f"::error::Erreur : {ex}")
         premiere = False
         if (time.time() - t0) / 60 > DUREE_MAX_MIN - ECART_MIN: return
+        if code_modifie():
+            log("::notice::Nouvelle version du code : on s'arrête, le prochain passage utilisera la nouvelle version."); return
         time.sleep(ECART_MIN * 60)
 
 if __name__ == "__main__":
