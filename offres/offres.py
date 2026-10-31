@@ -103,8 +103,9 @@ def gemini(prompt):
             time.sleep(attente)
     raise RuntimeError(" || ".join(erreurs)[-1500:])
 
-PROMPT = """Tu aides Sayidina Dicko, étudiant ingénieur en 5e année (Polytech Marseille, Microélectronique et Télécommunications),
-qui cherche un STAGE DE FIN D'ÉTUDES de 6 mois OU une ALTERNANCE, disponible dès le {dispo}.
+PROMPT = """Tu es un expert en recrutement et en optimisation de CV pour les logiciels de filtrage ATS.
+Tu aides Sayidina Dicko, étudiant ingénieur en dernière année (Polytech Marseille, Microélectronique et Télécommunications),
+qui cherche un STAGE DE FIN D'ÉTUDES de 6 mois OU une ALTERNANCE, disponible dès le {dispo}, mobile partout en France.
 
 Voici une offre LinkedIn :
 TITRE : {titre}
@@ -114,9 +115,15 @@ DESCRIPTION :
 {desc}
 
 Son résumé de base : {resume}
-Ses compétences de base : {comp}
-Ses projets : microprocesseur 8 bits RISC conçu en groupe (puce), optimisation de l'algorithme caméra Pixy2 sur voiture NXP CUP (S32K144), reconnaissance d'images sur carte avec NPU.
-Ses expériences : réparateur d'appareils électroniques (BFK Net Provence), stage chez AIME Toulouse (fabrication de cellules photovoltaïques), professeur particulier, serveur.
+Ses compétences réelles (par catégorie) : {comp}
+Ses projets académiques (dans cet ordre, à garder) : {projets}
+Ses expériences (dans cet ordre, à garder) : {experiences}
+
+RÈGLES ATS : analyse l'offre pour repérer les compétences clés (hard et soft skills), outils et expressions importants,
+et intègre-les NATURELLEMENT dans le résumé, les puces des projets et des expériences et les compétences.
+N'INVENTE JAMAIS d'expérience, de projet, de chiffre ou d'outil qu'il n'a pas utilisé : tu reformules seulement ce qui existe
+(un outil demandé mais jamais utilisé peut seulement apparaître dans les compétences, jamais dans une puce de projet ou d'expérience).
+Mets en avant les chiffres et résultats déjà présents (45 cellules, 27 µW, 3 corners PVT, sans violation DRC...).
 
 Réponds UNIQUEMENT en JSON avec ces clés :
 - "score": note de 0 à 10 de l'adéquation entre l'offre et son profil de MICROÉLECTRONIQUE. 9-10 = conception numérique/analogique, ASIC, FPGA, VHDL/Verilog, VLSI, vérification RTL, layout, semi-conducteurs, circuits intégrés. 7-8 = électronique embarquée proche du matériel (microcontrôleurs, firmware, PCB, RF, traitement du signal sur FPGA, IA embarquée sur NPU/FPGA). 0-4 = logiciel pur, web, UX/UI, data, IT, cloud, mécanique, chimie, marketing, commercial, ou tout ce qui n'est pas de l'électronique.
@@ -125,14 +132,20 @@ Réponds UNIQUEMENT en JSON avec ces clés :
 - "langue": "fr" si l'offre est en français, sinon "en".
 - "domaine": le domaine du stage en quelques mots, repris de l'offre (ex : "conception numérique ASIC/FPGA").
 - "ville": la ville de l'offre ; "code_postal": son code postal (5 chiffres en France ; si seul le département est donné, celui de la préfecture ; code postal local si étranger, sinon "") ; "departement": en France "Nom (numéro)" ex. "Loiret (45)", à l'étranger la région/l'état ; "pays": le pays.
-- "resume": résumé du CV (4 à 5 phrases, dans la langue de l'offre), calé sur le profil recherché en reprenant ses mots-clés, terminant par : "Recherche un stage de fin d'études de 6 mois en <domaine>, disponible dès le {dispo}." si c'est un stage, ou "Recherche une alternance en <domaine>, disponible dès le {dispo}." si c'est une alternance (ou l'équivalent anglais).
-- "competences": 14 à 16 compétences courtes (moins de 45 caractères chacune), dans la langue de l'offre : d'abord EXACTEMENT les compétences, outils et langages demandés dans l'offre (même s'ils ne sont pas dans ses compétences de base), puis ses compétences de base les plus proches.
+- "titre_cv": le titre du CV = EXACTEMENT l'intitulé du poste de l'offre (sans "H/F", sans référence).
+- "resume": résumé du CV (3 à 4 phrases, dans la langue de l'offre), qui reprend les mots-clés de l'offre, terminant par : "Recherche un stage de fin d'études de 6 mois en <domaine>, disponible dès le {dispo}." si c'est un stage, ou "Recherche une alternance en <domaine>, disponible dès le {dispo}." si c'est une alternance (ou l'équivalent anglais).
+- "projets": tableau de 5 tableaux de puces (1 à 3 puces courtes chacun, moins de 150 caractères par puce), un par projet dans le même ordre, reformulées avec les mots-clés de l'offre, sans rien inventer.
+- "experiences": tableau de 4 tableaux de puces (1 puce courte chacun), une par expérience dans le même ordre, reformulées pour faire ressortir les soft skills utiles à l'offre, sans rien inventer.
+- "competences": 5 à 6 lignes [catégorie, détail] (détail de moins de 160 caractères), dans la langue de l'offre : d'abord les compétences, outils et langages demandés dans l'offre (en reprenant leurs termes exacts), puis ses compétences réelles les plus proches ; la dernière ligne = savoir-être demandés dans l'offre.
 - "lettre": une lettre de motivation de 4 paragraphes (tableau de chaînes), dans la langue de l'offre, sans formule d'appel ni signature : pourquoi cette entreprise et ce poste, ce qu'il apporte (en reliant ses projets et compétences aux missions), sa disponibilité dès le {dispo} (pour 6 mois si stage, au rythme de l'alternance si alternance), demande d'entretien. Ton professionnel, concret, pas de phrases creuses.
 """
 
 def adapter(o, desc):
+    comp = " ; ".join(f"{c} : {d}" for c, d in D.COMPETENCES_BASE)
+    projets = " ; ".join(f"{i}) {t} ({c}) : {' '.join(bl)}" for i, (t, c, bl) in enumerate(D.PROJETS, 1))
+    experiences = " ; ".join(f"{i}) {t}, {o_} ({d}) : {' '.join(bl)}" for i, (t, o_, d, bl) in enumerate(D.EXPERIENCE, 1))
     return gemini(PROMPT.format(dispo=DISPO, titre=o["titre"], entreprise=o["entreprise"], lieu=o["lieu"], desc=desc,
-                                resume=D.RESUME_BASE, comp=", ".join(D.COMPETENCES_BASE)))
+                                resume=D.RESUME_BASE, comp=comp, projets=projets, experiences=experiences))
 
 # ---------- état ----------
 def charger():
@@ -235,7 +248,7 @@ def verification(st, premiere):
         nom = f"{nettoie(o['entreprise'])}_{o['id']}"
         cv, lm = f"/tmp/CV_Sayidina_Dicko_{nom}.pdf", f"/tmp/Lettre_Sayidina_Dicko_{nom}.pdf"
         ville, cp, pays = a.get("ville", ""), a.get("code_postal", ""), a.get("pays", "")
-        D.pdfs([(D.cv_html(a["resume"], a["competences"], ville, cp, pays), cv),
+        D.pdfs([(D.cv_html(a.get("resume"), a.get("competences"), ville, cp, pays, a.get("titre_cv") or o["titre"], a.get("experiences"), a.get("projets")), cv),
                 (D.lettre_html(a["lettre"], o["entreprise"], o["titre"], ville, cp, pays, a.get("langue", "fr")), lm)])
         genre = a.get("type", genre)
         tg_msg(f"{'🎓 ALTERNANCE' if genre == 'alternance' else '🎯 STAGE'} : {o['titre']}\n🏢 {o['entreprise']}\n📍 {o['lieu']}\n🧩 {a.get('domaine','')} (adéquation {a.get('score','?')}/10)\n\n"

@@ -1,66 +1,79 @@
-"""CV et lettre de motivation de Sayidina Dicko, en PDF.
-Seuls la ville, le résumé et les compétences changent d'une offre à l'autre."""
+"""CV (format ATS) et lettre de motivation de Sayidina Dicko, en PDF.
+
+CV compatible ATS : une seule colonne, lecture linéaire, aucun tableau / colonne / icône / zone de texte,
+puces standards, titres de sections universels. Pour chaque offre, l'IA adapte : le titre (= intitulé du poste),
+le résumé, les puces des expériences et des projets (mots-clés de l'offre, sans rien inventer) et les compétences."""
 import os, html, datetime
 from playwright.sync_api import sync_playwright
 
 TEL = os.environ.get("CV_TEL", "").strip()
 EMAIL = os.environ.get("CV_EMAIL", "").strip()
 NOM = "Sayidina Dicko"
+TITRE_BASE = "Stage de fin d'études – Systèmes embarqués, IA et conception de circuits numériques"
+MOBILITE = "Disponible dès le 1er novembre 2026 – Mobile partout en France"
 
+# (intitulé, entreprise / lieu, dates, puces de base)
 EXPERIENCE = [
-    ("07/2025 –<br>09/2025", "Réparateur d'appareils électroniques", "BFK Net Provence", "Marseille", []),
-    ("", "Stagiaire", "AIME", "Toulouse", ["Assisté à la fabrication de cellules photovoltaïques."]),
-    ("10/2022 –<br>07/2023", "Professeur particulier", "Méthodik", "Paris", []),
-    ("12/2023 –<br>Présent", "Serveur/Barman", "Rodizio Brazil", "Marseille", []),
+    ("Réparateur d'appareils électroniques", "BFK Net Provence, Marseille", "Juillet 2025 à septembre 2025",
+     ["Diagnostic de pannes et réparation d'appareils électroniques."]),
+    ("Stagiaire", "AIME, Toulouse", "Stage",
+     ["Assistance à la fabrication de cellules photovoltaïques."]),
+    ("Professeur particulier", "Méthodik, Paris", "Octobre 2022 à juillet 2023",
+     ["Cours particuliers : pédagogie et transmission des savoirs."]),
+    ("Serveur / Barman", "Rodizio Brazil, Marseille", "Décembre 2023 à aujourd'hui",
+     ["Travail en équipe sous pression, relation client."]),
 ]
+# (titre, contexte, puces de base) — projets réellement réalisés
 PROJETS = [
-    ("Optimisation de l'algorithme de la caméra Pixy2 d'une voiture NXP CUP",
-     "Microcontrôleur S32K144-Q100 (projet en cours)."),
-    ("Réalisation d'une puce électronique en groupe : microprocesseur 8 bits RISC",
-     "Conception de circuits intégrés numériques, programmation de microcontrôleurs."),
+    ("Conception d'un bloc CRC-8 en ASIC, du VHDL au layout", "Projet individuel, 5e année, technologie AMS 0,35 µm",
+     ["Description VHDL bit-série (polynôme 0x07) et testbench auto-vérifiant sous ModelSim.",
+      "Synthèse sous Synopsys Design Vision : 45 cellules, 27 µW, timing validé sur 3 corners PVT.",
+      "Placement-routage sous Cadence Innovus (floorplan, CTS) sans violation DRC ni antenne ; vérification post-P&R avec back-annotation SDF."]),
+    ("Microprocesseur RISC 8 bits", "Projet de groupe",
+     ["Conception d'une puce numérique complète : RTL, synthèse et implémentation physique."]),
+    ("Conception sur FPGA Xilinx", "4e année",
+     ["Description VHDL, simulation comportementale, synthèse et implémentation sous Vivado, test sur carte."]),
+    ("Traitement d'image embarqué – caméra Pixy2, voiture autonome NXP CUP", "Projet en cours",
+     ["Optimisation de l'algorithme de vision en C sur microcontrôleur NXP S32K144-Q100, sous contrainte de temps réel."]),
+    ("Reconnaissance d'images par IA embarquée", "Carte DBX Modèle A avec NPU intégré",
+     ["Classification d'images en 3 classes (avion, bateau, voiture) sur cible embarquée."]),
 ]
 FORMATION = [
-    ("09/2023 –<br>Présent", "Polytech", "Cycle ingénieur, Microélectronique et Télécommunications", "Marseille"),
-    ("09/2020 –<br>07/2022", "Lycée Baggio", "CPGE, PTSI", "Lille"),
-    ("09/2019 –<br>07/2020", "Lycée KND", "Baccalauréat", ""),
+    ("Cycle ingénieur – Microélectronique et Télécommunications", "Polytech Marseille", "Septembre 2023 à aujourd'hui"),
+    ("CPGE PTSI (classe préparatoire scientifique)", "Lycée Baggio, Lille", "Septembre 2020 à juillet 2022"),
+    ("Baccalauréat", "Lycée KND", "Septembre 2019 à juillet 2020"),
 ]
-LANGUES = [("Français", "langue maternelle", 100), ("Anglais", "B2", 62)]
+LANGUES = "Français : langue maternelle | Anglais : B2"
 
-# Compétences réelles (base) : l'IA les reformule et ajoute ce que l'offre demande.
+# Compétences réelles (base), par catégorie : l'IA les réordonne et ajoute les mots-clés de l'offre.
 COMPETENCES_BASE = [
-    "Conception numérique VHDL/Verilog", "Flot complet VLSI numérique (RTL → layout)",
-    "Synthèse logique (Synopsys Design Vision)", "Placement et routage ASIC (Cadence Innovus)",
-    "Vérifications physiques (DRC, LVS, Calibre)", "Analyse temporelle statique (STA)",
-    "Conception analogique (Cadence Virtuoso)", "Simulation analogique (AC/DC, transitoire, bruit, Monte Carlo)",
-    "Programmation en C, C++ et Python", "Systèmes embarqués et microcontrôleurs (NXP S32K144)",
-    "IA / accélération matérielle (NPU)", "Reconnaissance d'images embarquée",
-    "QuestaSim", "TCAD Sentaurus", "SolidWorks", "Linux",
+    ("Conception numérique", "VHDL, Verilog, flot ASIC complet (RTL → layout), Synopsys Design Vision, Cadence Innovus (P&R, CTS), DRC / LVS, analyse temporelle statique (STA), scripting Tcl (SDC)"),
+    ("Conception analogique", "Cadence Virtuoso (schéma, layout), simulation DC / AC / transitoire / bruit / Monte Carlo, Sentaurus TCAD"),
+    ("FPGA et vérification", "Xilinx Vivado, Intel Quartus, HLS IP Gen Compiler Altera, ModelSim / QuestaSim, testbenchs auto-vérifiants"),
+    ("Systèmes embarqués et IA", "C, C++, Python, microcontrôleurs NXP S32K144, traitement d'image et du signal, IA embarquée sur NPU"),
+    ("Outils", "Linux, Git, SolidWorks"),
+    ("Savoir-être", "Rigueur, autonomie, esprit d'analyse, travail en équipe, rédaction technique en anglais"),
 ]
-RESUME_BASE = ("Étudiant ingénieur en microélectronique et télécommunications avec une solide expertise en conception "
-               "numérique, VHDL/Verilog, et flot complet VLSI. Maîtrise des outils tels que Synopsys Design Vision et "
-               "Cadence Innovus pour la synthèse logique, le placement/routage et les vérifications physiques. Possède "
-               "des compétences en programmation C/C++/Python et systèmes embarqués, avec un intérêt pour l'IA et "
-               "l'accélération matérielle.")
+RESUME_BASE = ("Étudiant ingénieur en dernière année de Microélectronique et Télécommunications à Polytech Marseille. "
+               "Maîtrise du flot complet de conception de circuits intégrés, du VHDL au layout (synthèse, placement-routage, "
+               "DRC/LVS, STA), de la conception analogique sous Cadence Virtuoso et du développement FPGA sous Vivado. "
+               "Compétences en programmation C/C++/Python, systèmes embarqués et IA embarquée. "
+               "Recherche un stage de fin d'études de 6 mois en systèmes embarqués, IA et conception de circuits numériques, "
+               "disponible dès le 1er novembre 2026.")
 
 CSS = """
 @page { size: A4; margin: 0; }
 * { box-sizing: border-box; }
-body { margin: 0; font-family: 'Liberation Sans', Arial, sans-serif; font-size: 9.6pt; color: #111; }
-.page { width: 210mm; min-height: 297mm; padding: 11mm 14mm 10mm 14mm; }
-h1 { text-align: center; font-size: 17pt; margin: 0 0 3px; }
-.contact { text-align: center; font-size: 8.8pt; margin-bottom: 9px; }
-.contact a { color: #1a56c4; }
-.sec { display: grid; grid-template-columns: 37mm 1fr; border-top: 1.2px solid #222; padding: 7px 0 8px; }
-.lab { font-size: 8.4pt; color: #555; text-transform: uppercase; letter-spacing: .2px; padding-top: 1px; }
-.row { display: grid; grid-template-columns: 37mm 1fr auto; margin: 0 0 7px; }
-.row .d { font-size: 8.4pt; color: #555; }
-.row b { display: block; }
-.row ul { margin: 2px 0 0 18px; padding: 0; }
-.resume { line-height: 1.32; }
-.proj b { display: block; } .proj div { margin-bottom: 5px; }
-.skills { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 16px; }
-.lang { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
-.bar { height: 6px; background: #ddd; margin-top: 3px; } .bar i { display: block; height: 100%; background: #222; }
+body { margin: 0; font-family: Arial, 'Liberation Sans', sans-serif; font-size: 9.4pt; color: #000; line-height: 1.27; }
+.page { width: 210mm; padding: 10mm 15mm 9mm 15mm; }
+h1 { font-size: 18pt; margin: 0; }
+.titre { font-size: 11.5pt; font-weight: bold; margin: 2px 0 3px; }
+.contact { margin: 0 0 2px; }
+h2 { font-size: 11pt; text-transform: uppercase; border-bottom: 1px solid #000; margin: 8px 0 4px; padding-bottom: 1px; }
+h3 { font-size: 10pt; margin: 5px 0 0; }
+.m { margin: 0 0 1px; }
+ul { margin: 1px 0 0 17px; padding: 0; } li { margin: 0 0 1px; }
+p { margin: 0; }
 .lettre { padding: 20mm 22mm; font-size: 10.5pt; line-height: 1.45; }
 .lettre p { margin: 0 0 9px; text-align: justify; }
 """
@@ -69,30 +82,38 @@ e = html.escape
 def adresse(ville, cp, pays):
     return ", ".join(x for x in [ville, cp, pays] if x)
 
-def contact_html(ville, cp, pays):
-    parts = [e(adresse(ville, cp, pays))]
-    if TEL: parts.append(e(TEL))
-    if EMAIL: parts.append(f'<a href="mailto:{e(EMAIL)}">{e(EMAIL)}</a>')
-    return ", ".join(parts)
+def ul(items):
+    return f"<ul>{''.join(f'<li>{e(x)}</li>' for x in items if x)}</ul>" if items else ""
 
-def cv_html(resume, competences, ville, cp, pays):
+def cv_html(resume, competences, ville, cp, pays, titre=None, experiences=None, projets=None):
+    """competences : liste de [catégorie, détail] (ou liste de chaînes, ancien format).
+    experiences / projets : listes de listes de puces, dans le même ordre que EXPERIENCE / PROJETS (optionnel)."""
+    contact = " | ".join(x for x in [adresse(ville, cp, pays), TEL, EMAIL] if x)
     exp = "".join(
-        f'<div class="row"><div class="d">{d}</div><div><b>{e(t)}</b>{e(o)}'
-        + (f"<ul>{''.join(f'<li>{e(x)}</li>' for x in bl)}</ul>" if bl else "")
-        + f'</div><div>{e(v)}</div></div>' for d, t, o, v, bl in EXPERIENCE)
-    form = "".join(f'<div class="row"><div class="d">{d}</div><div><b>{e(t)}</b>{e(o)}</div><div>{e(v)}</div></div>'
-                   for d, t, o, v in FORMATION)
-    proj = "".join(f"<div><b>{e(t)}</b>{e(s)}</div>" for t, s in PROJETS)
-    comp = "".join(f"<div>{e(c)}</div>" for c in competences)
-    lang = "".join(f'<div><b>{e(n)}</b> ({e(l)})<div class="bar"><i style="width:{p}%"></i></div></div>' for n, l, p in LANGUES)
-    return f"""<!doctype html><html lang="fr"><head><meta charset="utf-8"><style>{CSS}</style></head><body><div class="page">
-<h1>{NOM}</h1><div class="contact">{contact_html(ville, cp, pays)}</div>
-<div class="sec"><div class="lab">Résumé</div><div class="resume">{e(resume)}</div></div>
-<div class="sec" style="display:block"><div class="lab" style="margin-bottom:6px">Expérience<br>professionnelle</div>{exp}</div>
-<div class="sec" style="display:block"><div class="lab" style="margin-bottom:6px">Formation</div>{form}</div>
-<div class="sec"><div class="lab">Projets<br>académiques</div><div class="proj">{proj}</div></div>
-<div class="sec"><div class="lab">Connaissances</div><div class="skills">{comp}</div></div>
-<div class="sec"><div class="lab">Langues</div><div class="lang">{lang}</div></div>
+        f"<h3>{e(t)}</h3><p class='m'>{e(o)} | {e(d)}</p>"
+        + ul((experiences[i] if experiences and i < len(experiences) and experiences[i] else bl))
+        for i, (t, o, d, bl) in enumerate(EXPERIENCE))
+    form = "".join(f"<h3>{e(t)}</h3><p class='m'>{e(o)} | {e(d)}</p>" for t, o, d in FORMATION)
+    proj = "".join(
+        f"<h3>{e(t)}</h3><p class='m'>{e(c)}</p>"
+        + ul((projets[i] if projets and i < len(projets) and projets[i] else bl))
+        for i, (t, c, bl) in enumerate(PROJETS))
+    comp_items = []
+    for c in (competences or COMPETENCES_BASE):
+        if isinstance(c, (list, tuple)) and len(c) == 2: comp_items.append(f"{c[0]} : {c[1]}")
+        elif isinstance(c, dict): comp_items.append(f"{c.get('categorie', '')} : {c.get('detail', '')}")
+        else: comp_items.append(str(c))
+    return f"""<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>CV {NOM}</title><style>{CSS}</style></head><body><div class="page">
+<h1>{NOM}</h1>
+<p class="titre">{e(titre or TITRE_BASE)}</p>
+<p class="contact">{e(contact)}</p>
+<p class="contact">{e(MOBILITE)}</p>
+<h2>Résumé</h2><p>{e(resume or RESUME_BASE)}</p>
+<h2>Formation</h2>{form}
+<h2>Projets académiques</h2>{proj}
+<h2>Expérience professionnelle</h2>{exp}
+<h2>Compétences</h2>{ul(comp_items)}
+<h2>Langues</h2><p>{e(LANGUES)}</p>
 </div></body></html>"""
 
 def lettre_html(paragraphes, entreprise, poste, ville, cp, pays, langue="fr"):
@@ -111,9 +132,12 @@ def lettre_html(paragraphes, entreprise, poste, ville, cp, pays, langue="fr"):
 <p><b>{e(objet)}</b></p><p>{salut}</p>{corps}<p style="margin-top:18px">{e(fin)}</p></div></body></html>"""
 
 def pdfs(jobs):
-    """jobs : liste de (html, chemin_pdf)."""
+    """jobs : liste de (html, chemin_pdf). Le CV est ramené à une page si besoin (réduction légère)."""
     with sync_playwright() as p:
         b = p.chromium.launch(); pg = b.new_page()
         for h, out in jobs:
-            pg.set_content(h); pg.pdf(path=out, format="A4", print_background=True)
+            pg.set_content(h)
+            haut = pg.evaluate("document.body.scrollHeight")
+            echelle = min(1.0, 1122 / haut) if haut else 1.0          # 1122 px ≈ hauteur d'une page A4
+            pg.pdf(path=out, format="A4", print_background=True, scale=max(0.8, echelle))
         b.close()
