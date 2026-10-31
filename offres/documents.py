@@ -70,7 +70,7 @@ CSS = """
 @page { size: A4; margin: 0; }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: Arial, 'Liberation Sans', sans-serif; font-size: 9.4pt; color: #000; line-height: 1.27; }
-.page { width: 210mm; padding: 10mm 15mm 9mm 15mm; }
+.page { width: 210mm; padding: 10mm 15mm 8mm 15mm; overflow: hidden; }
 h1 { font-size: 18pt; margin: 0; }
 .titre { font-size: 11.5pt; font-weight: bold; margin: 2px 0 3px; }
 .contact { margin: 0 0 2px; }
@@ -117,7 +117,7 @@ def cv_html(resume, competences, ville, cp, pays, titre=None, experiences=None, 
 <h2>Formation</h2>{form}
 <h2>Projets académiques</h2>{proj}
 <h2>Expérience professionnelle</h2>{exp}
-<h2>Compétences</h2>{ul(comp_items)}
+<h2>Compétences</h2>{ul(comp_items).replace('<ul>', '<ul class="keep">', 1)}
 <h2>Langues</h2><p>{e(LANGUES)}</p>
 </div></body></html>"""
 
@@ -136,13 +136,35 @@ def lettre_html(paragraphes, entreprise, poste, ville, cp, pays, langue="fr"):
 <div style="text-align:right;margin:14px 0 18px">{e(date)}</div>
 <p><b>{e(objet)}</b></p><p>{salut}</p>{corps}<p style="margin-top:18px">{e(fin)}</p></div></body></html>"""
 
+ECHELLE_MIN = 0.75   # en dessous, le texte devient trop petit : on retire plutôt des puces
+
+AJUSTE_UNE_PAGE = """(lim) => {
+  // Le CV DOIT tenir sur une seule page A4. Si le contenu est trop long même réduit à 75 %,
+  // on retire les puces les moins importantes (dernière puce des listes les plus longues), jamais les compétences.
+  const page = document.querySelector('.page'); if (!page) return -1;
+  let n = 0;
+  while (page.scrollHeight > lim && n < 40) {
+    const listes = [...page.querySelectorAll('ul:not(.keep)')].filter(u => u.children.length > 1);
+    if (!listes.length) break;
+    listes.sort((x, y) => y.children.length - x.children.length);
+    listes[0].lastElementChild.remove(); n++;
+  }
+  return page.scrollHeight;
+}"""
+
 def pdfs(jobs):
-    """jobs : liste de (html, chemin_pdf). Le CV est ramené à une page si besoin (réduction légère)."""
+    """jobs : liste de (html, chemin_pdf). Le CV est toujours ramené à UNE seule page (réduction + page 1 seulement)."""
+    A4 = 1122                                            # hauteur d'une page A4 en px (96 dpi)
     with sync_playwright() as p:
-        b = p.chromium.launch(); pg = b.new_page()
+        b = p.chromium.launch(); pg = b.new_page(viewport={"width": 794, "height": 1123})
+        pg.emulate_media(media="print")
         for h, out in jobs:
             pg.set_content(h)
-            haut = pg.evaluate("document.body.scrollHeight")
-            echelle = min(1.0, 1122 / haut) if haut else 1.0          # 1122 px ≈ hauteur d'une page A4
-            pg.pdf(path=out, format="A4", print_background=True, scale=max(0.8, echelle))
+            haut = pg.evaluate(AJUSTE_UNE_PAGE, int(A4 / ECHELLE_MIN))
+            if haut > 0:                                 # CV
+                echelle = max(ECHELLE_MIN, min(1.0, (A4 - 4) / haut))
+                print(f"CV une page : hauteur {haut}px, échelle {echelle:.2f}", flush=True)
+                pg.pdf(path=out, format="A4", print_background=True, scale=echelle, page_ranges="1")
+            else:                                        # lettre
+                pg.pdf(path=out, format="A4", print_background=True)
         b.close()
