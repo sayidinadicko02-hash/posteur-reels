@@ -102,7 +102,7 @@ def gemini(prompt):
             attente = 20 * (essai + 1)
             mt = re.search(r'"retryDelay":\s*"(\d+)s"', r.text)
             if mt: attente = min(90, int(mt.group(1)) + 2)
-            if "PerDay" in r.text: break                              # quota du jour épuisé pour ce modèle
+            if "PerDay" in r.text: erreurs.append(f"{m} PerDay"); break   # quota du jour épuisé pour ce modèle
             time.sleep(attente)
     raise RuntimeError(" || ".join(erreurs)[-1500:])
 
