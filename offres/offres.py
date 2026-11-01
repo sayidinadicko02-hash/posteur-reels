@@ -15,6 +15,8 @@ RECHERCHES = [
     "stage vérification numérique", "stage layout", "stage semi-conducteurs", "stage design RTL",
     "stage électronique embarquée", "stage systèmes embarqués électronique", "stage hardware",
     "stage radiofréquence", "stage traitement du signal FPGA", "stage IA embarquée FPGA",
+    "stage IA embarquée", "stage edge AI", "stage logiciel embarqué microcontrôleur", "stage firmware",
+    "embedded systems internship", "embedded AI internship",
     "FPGA internship", "ASIC internship", "analog design internship", "digital design internship",
     "RTL design internship", "semiconductor internship", "hardware engineer internship",
 ]
@@ -23,6 +25,7 @@ RECHERCHES_ALT = [         # alternances : LinkedIn ne les classe pas en "stage"
     "alternance conception numérique", "alternance conception analogique", "alternance électronique embarquée",
     "alternance systèmes embarqués", "alternance semi-conducteurs", "alternance hardware", "alternance radiofréquence",
     "apprentissage ingénieur électronique", "alternance ingénieur FPGA", "alternance vérification RTL",
+    "alternance IA embarquée", "alternance logiciel embarqué",
 ]
 LIEUX = ["France"]
 PAR_PASSAGE = 6          # recherches LinkedIn par vérification (on tourne dans la liste)
@@ -126,7 +129,7 @@ N'INVENTE JAMAIS d'expérience, de projet, de chiffre ou d'outil qu'il n'a pas u
 Mets en avant les chiffres et résultats déjà présents (45 cellules, 27 µW, 3 corners PVT, sans violation DRC...).
 
 Réponds UNIQUEMENT en JSON avec ces clés :
-- "score": note de 0 à 10 de l'adéquation entre l'offre et son profil de MICROÉLECTRONIQUE. 9-10 = conception numérique/analogique, ASIC, FPGA, VHDL/Verilog, VLSI, vérification RTL, layout, semi-conducteurs, circuits intégrés. 7-8 = électronique embarquée proche du matériel (microcontrôleurs, firmware, PCB, RF, traitement du signal sur FPGA, IA embarquée sur NPU/FPGA). 0-4 = logiciel pur, web, UX/UI, data, IT, cloud, mécanique, chimie, marketing, commercial, ou tout ce qui n'est pas de l'électronique.
+- "score": note de 0 à 10 de l'adéquation entre l'offre et son profil (électronique embarquée, conception de circuits numériques, IA embarquée). 9-10 = ses 3 cibles prioritaires : systèmes / électronique embarqués, conception de circuits numériques (ASIC, FPGA, VHDL/Verilog, RTL, VLSI, vérification), IA embarquée (edge AI, NPU, accélération matérielle). 7-8 = conception analogique, layout, semi-conducteurs, firmware, microcontrôleurs, PCB, RF, traitement du signal sur cible embarquée. 0-4 = logiciel pur, web, UX/UI, data, IT, cloud, mécanique, chimie, marketing, commercial, ou tout ce qui n'est pas de l'électronique.
 - "type": "stage" (stage / internship / PFE / fin d'études), "alternance" (alternance / apprentissage / contrat de professionnalisation / work-study) ou "emploi" (CDI, CDD, poste d'ingénieur, jeune diplômé, VIE, freelance, thèse...). Une offre "Ingénieur X" ou "Concepteur X" sans les mots stage/alternance dans le titre ou la description est "emploi".
 - "pertinent": true seulement si type vaut "stage" ou "alternance" ET score >= 7 ; sinon false.
 - "langue": "fr" si l'offre est en français, sinon "en".
