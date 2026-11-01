@@ -29,9 +29,9 @@ RECHERCHES_ALT = [         # alternances : LinkedIn ne les classe pas en "stage"
 ]
 LIEUX = ["France"]
 PAR_PASSAGE = 12         # recherches LinkedIn par vérification (on tourne dans la liste)
-MAX_OFFRES = 12          # offres traitées max par vérification (limite gratuite Gemini)
-MAX_PAR_HEURE = 12       # liens envoyés max sur 1 heure glissante
-ECART_MIN = 7            # minutes entre deux vérifications
+MAX_OFFRES = 10          # offres analysées max par vérification
+MAX_PAR_HEURE = 60       # jusqu'à 10 CV par passage, 6 passages par heure
+ECART_MIN = 10           # minutes entre deux vérifications
 DUREE_MAX_MIN = 330
 DISPO = "1er novembre 2026"
 # ------------------------------------------
