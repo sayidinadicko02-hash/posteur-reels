@@ -28,10 +28,10 @@ RECHERCHES_ALT = [         # alternances : LinkedIn ne les classe pas en "stage"
     "alternance IA embarquée", "alternance logiciel embarqué",
 ]
 LIEUX = ["France"]
-PAR_PASSAGE = 6          # recherches LinkedIn par vérification (on tourne dans la liste)
-MAX_OFFRES = 8           # offres traitées max par vérification (limite gratuite Gemini)
-MAX_PAR_HEURE = 5        # liens envoyés max sur 1 heure glissante
-ECART_MIN = 10           # minutes entre deux vérifications
+PAR_PASSAGE = 12         # recherches LinkedIn par vérification (on tourne dans la liste)
+MAX_OFFRES = 12          # offres traitées max par vérification (limite gratuite Gemini)
+MAX_PAR_HEURE = 12       # liens envoyés max sur 1 heure glissante
+ECART_MIN = 7            # minutes entre deux vérifications
 DUREE_MAX_MIN = 330
 DISPO = "1er novembre 2026"
 # ------------------------------------------
@@ -209,7 +209,7 @@ def deja_envoyee(o, st):
 def nettoie(s): return re.sub(r"[^A-Za-z0-9]+", "_", s)[:40].strip("_")
 
 def verification(st, premiere):
-    periode = "r86400"                                   # offres publiées dans les dernières 24 h
+    periode = "r604800"                                  # offres publiées dans les 7 derniers jours (les déjà vues sont ignorées)
     maintenant = time.time()
     st["envois"] = [t for t in st["envois"] if maintenant - t < 3600]
     quota = MAX_PAR_HEURE - len(st["envois"])
@@ -242,7 +242,12 @@ def verification(st, premiere):
         try:
             a = adapter(o, desc)
         except Exception as ex:
-            log(f"::warning::Gemini KO {ex}"); st["vues"].remove(o["id"]); break
+            log(f"::warning::Gemini KO {ex}"); st["vues"].remove(o["id"])
+            jour = datetime.date.today().isoformat()
+            if "PerDay" in str(ex) and st.get("alerte_quota") != jour:
+                st["alerte_quota"] = jour
+                tg_msg("⚠️ Chercheur d'offres : quota gratuit Gemini du jour épuisé, les CV reprennent demain matin.")
+            break
         traitees += 1
         if a.get("type") not in ("stage", "alternance") or not a.get("pertinent") or int(a.get("score", 0) or 0) < 7:
             log("Hors sujet :", o["titre"]); continue
