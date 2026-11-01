@@ -23,7 +23,7 @@ EXPERIENCE = [
     ("Stagiaire", "AIME, Toulouse", "Stage",
      ["Assistance à la fabrication de cellules photovoltaïques.",
       "Participation aux étapes de fabrication en salle blanche : nettoyage des substrats, dépôt de couches minces, métallisation."]),
-    ("Professeur particulier", "Méthodik, Paris", "Octobre 2022 à juillet 2023",
+    ("Professeur particulier", "Méthodik, Paris", "Octobre 2022 à mai 2023",
      ["Cours particuliers : pédagogie et transmission des savoirs."]),
     ("Serveur / Barman", "Rodizio Brazil, Marseille", "Décembre 2023 à aujourd'hui",
      ["Travail en équipe sous pression, relation client."]),
