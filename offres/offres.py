@@ -150,7 +150,42 @@ def gemini(prompt):
             if mt: attente = min(90, int(mt.group(1)) + 2)
             if "PerDay" in r.text: erreurs.append(f"{m} PerDay"); break   # quota du jour épuisé pour ce modèle
             time.sleep(attente)
+    # Gemini indisponible (quota du jour, surcharge…) : Groq prend le relais s'il y a une clé
+    try:
+        return groq(prompt)
+    except Exception as ex:
+        erreurs.append(f"Groq {str(ex)[:300]}")
     raise RuntimeError(" || ".join(erreurs)[-1500:])
+
+GROQ_MODELES = ["llama-3.3-70b-versatile", "openai/gpt-oss-120b"]
+
+def groq(prompt):
+    """Secours quand Gemini est épuisé : API Groq (format OpenAI), réponse JSON."""
+    key = os.environ.get("GROQ_API_KEY", "").strip()
+    if not key: raise RuntimeError("pas de clé GROQ_API_KEY")
+    erreurs = []
+    for m in GROQ_MODELES:
+        for essai in range(2):
+            try:
+                r = requests.post("https://api.groq.com/openai/v1/chat/completions", timeout=75,
+                                  headers={"Authorization": f"Bearer {key}"},
+                                  json={"model": m, "temperature": 0.4, "response_format": {"type": "json_object"},
+                                        "messages": [{"role": "user", "content": prompt}]})
+            except Exception as ex:
+                erreurs.append(f"{m} {ex}"); continue
+            if r.status_code == 200:
+                try:
+                    log(f"(analyse faite par Groq {m})")
+                    return json.loads(r.json()["choices"][0]["message"]["content"])
+                except Exception as ex:
+                    erreurs.append(f"{m} réponse illisible {ex}"); continue
+            erreurs.append(f"{m} {r.status_code} {r.text[:200]}")
+            if r.status_code == 429:
+                mt = re.search(r"try again in ([\d.]+)s", r.text)
+                time.sleep(min(60, float(mt.group(1)) + 1) if mt else 20)
+            else:
+                break
+    raise RuntimeError(" | ".join(erreurs)[-800:])
 
 PROMPT = """Tu es un expert en recrutement et en optimisation de CV pour les logiciels de filtrage ATS.
 Tu aides Sayidina Dicko, étudiant ingénieur en dernière année (Polytech Marseille, Microélectronique et Télécommunications),
@@ -346,7 +381,7 @@ def verification(st, premiere):
             jour = datetime.date.today().isoformat()
             if "PerDay" in str(ex) and st.get("alerte_quota") != jour:
                 st["alerte_quota"] = jour
-                tg_msg("⚠️ Chercheur d'offres : quota gratuit Gemini du jour épuisé, les CV reprennent demain matin.")
+                tg_msg("⚠️ Chercheur d'offres : quota Gemini du jour épuisé et Groq indisponible, les CV reprennent dès que l'un des deux est de nouveau disponible.")
             break
         traitees += 1
         if a.get("type") not in ("stage", "alternance") or not a.get("pertinent") or int(a.get("score", 0) or 0) < 7:
