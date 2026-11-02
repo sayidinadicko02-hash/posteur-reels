@@ -28,7 +28,8 @@ RECHERCHES_ALT = [         # alternances : LinkedIn ne les classe pas en "stage"
     "alternance IA embarquée", "alternance logiciel embarqué",
 ]
 LIEUX = ["France"]
-PAR_PASSAGE = 12         # recherches LinkedIn par vérification (on tourne dans la liste)
+PAR_PASSAGE = 5          # recherches LinkedIn par vérification (on tourne dans la liste)
+PAGES = 4                # pages de résultats lues par recherche (10 offres par page)
 MAX_OFFRES = 10          # offres analysées max par vérification
 MAX_PAR_HEURE = 60       # jusqu'à 10 CV par passage, 6 passages par heure
 ECART_MIN = 10           # minutes entre deux vérifications
@@ -55,11 +56,17 @@ def tg_doc(path, caption=""):
         requests.post(f"{TG}/sendDocument", data={"chat_id": CHAT, "caption": caption[:1000]}, files={"document": f}, timeout=60)
 
 # ---------- LinkedIn (pages publiques, sans connexion) ----------
-def chercher(mots, lieu, periode, stage=True):
-    params = {"keywords": mots, "location": lieu, "f_TPR": periode, "start": 0}
+BLOQUE = {"jusqua": 0}       # LinkedIn renvoie 429 quand on va trop vite : on fait une pause
+
+def chercher(mots, lieu, periode, stage=True, start=0):
+    if time.time() < BLOQUE["jusqua"]: return []
+    params = {"keywords": mots, "location": lieu, "f_TPR": periode, "start": start}
     if stage: params["f_JT"] = "I"
     url = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?" + urllib.parse.urlencode(params)
     r = requests.get(url, headers=UA, timeout=30)
+    if r.status_code == 429:
+        BLOQUE["jusqua"] = time.time() + 300
+        log(f"::warning::LinkedIn 429 (trop de requêtes) : pause de 5 min"); return []
     if r.status_code != 200:
         log(f"::warning::LinkedIn {r.status_code} {mots} {lieu}"); return []
     soup = BeautifulSoup(r.text, "html.parser"); out = []
@@ -224,7 +231,7 @@ def deja_envoyee(o, st):
 def nettoie(s): return re.sub(r"[^A-Za-z0-9]+", "_", s)[:40].strip("_")
 
 def verification(st, premiere):
-    periode = "r604800"                                  # offres publiées dans les 7 derniers jours (les déjà vues sont ignorées)
+    periode = "r2592000"                                 # offres publiées dans les 30 derniers jours (les déjà vues sont ignorées)
     maintenant = time.time()
     st["envois"] = [t for t in st["envois"] if maintenant - t < 3600]
     quota = MAX_PAR_HEURE - len(st["envois"])
@@ -236,11 +243,14 @@ def verification(st, premiere):
     st["tour"] = debut + PAR_PASSAGE
     vues = set(st["vues"]); cles = set(st["cles"]); nouvelles = {}
     for mots, lieu, stage in lot:
-        for o in chercher(mots, lieu, periode, stage):
-            cle = (o["titre"] + "|" + o["entreprise"]).lower()   # même offre republiée sous un autre numéro
-            if o["id"] in vues or cle in cles or deja_envoyee(o, st): continue
-            nouvelles[o["id"]] = o
-        time.sleep(random.uniform(2, 5))
+        for page in range(PAGES):
+            res = chercher(mots, lieu, periode, stage, start=page * 10)
+            for o in res:
+                cle = (o["titre"] + "|" + o["entreprise"]).lower()   # même offre republiée sous un autre numéro
+                if o["id"] in vues or cle in cles or deja_envoyee(o, st): continue
+                nouvelles[o["id"]] = o
+            time.sleep(random.uniform(3, 7))
+            if len(res) < 10: break                       # plus de résultats pour cette recherche
     log(f"::notice::{len(nouvelles)} nouvelle(s) offre(s) sur {len(lot)} recherches")
     traitees = 0; envoyes = 0
     for o in list(nouvelles.values()):
