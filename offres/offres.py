@@ -138,7 +138,7 @@ Mets en avant les chiffres et résultats déjà présents (45 cellules, 27 µW, 
 Réponds UNIQUEMENT en JSON avec ces clés :
 - "score": note de 0 à 10 de l'adéquation entre l'offre et son profil (électronique embarquée, conception de circuits numériques, IA embarquée). 9-10 = ses 3 cibles prioritaires : systèmes / électronique embarqués, conception de circuits numériques (ASIC, FPGA, VHDL/Verilog, RTL, VLSI, vérification), IA embarquée (edge AI, NPU, accélération matérielle). 7-8 = conception analogique, layout, semi-conducteurs, firmware, microcontrôleurs, PCB, RF, traitement du signal sur cible embarquée. 0-4 = logiciel pur, web, UX/UI, data, IT, cloud, mécanique, chimie, marketing, commercial, ou tout ce qui n'est pas de l'électronique.
 - "type": "stage" (stage / internship / PFE / fin d'études), "alternance" (alternance / apprentissage / contrat de professionnalisation / work-study) ou "emploi" (CDI, CDD, poste d'ingénieur, jeune diplômé, VIE, freelance, thèse...). Une offre "Ingénieur X" ou "Concepteur X" sans les mots stage/alternance dans le titre ou la description est "emploi".
-- "pertinent": true seulement si type vaut "stage" ou "alternance" ET score >= 8 ; sinon false. Sois STRICT : logiciel pur, cybersécurité, data, qualité, méthodes, GNC, radar/systèmes, photonique, télécoms réseau = score 5 maximum.
+- "pertinent": true seulement si type vaut "stage" ou "alternance" ET score >= 7 ; sinon false. Sois STRICT : logiciel pur, cybersécurité, data, qualité, méthodes, GNC, radar/systèmes, photonique, télécoms réseau = score 5 maximum.
 - "langue": "fr" si l'offre est en français, sinon "en".
 - "domaine": le domaine du stage en quelques mots, repris de l'offre (ex : "conception numérique ASIC/FPGA").
 - "ville": la ville de l'offre ; "code_postal": son code postal (5 chiffres en France ; si seul le département est donné, celui de la préfecture ; code postal local si étranger, sinon "") ; "departement": en France "Nom (numéro)" ex. "Loiret (45)", à l'étranger la région/l'état ; "pays": le pays.
@@ -191,7 +191,7 @@ def dans_domaine(o, desc):
     if TITRE_EXCLU.search(titre) or not TITRE_CIBLE.search(titre): return False
     if re.search(r"logiciel|software", titre, re.I) and not re.search(r"embarqu|embedded|firmware", titre, re.I): return False
     t = (" " + titre + " " + desc + " ").lower()
-    return sum(m in t for m in MOTS_DOMAINE) >= 3
+    return sum(m in t for m in MOTS_DOMAINE) >= 2
 
 TYPE_STAGE = re.compile(r"\bstag(e|es|iaire)\b|intern(ship)?\b|\bpfe\b|fin d.?[ée]tudes|trainee", re.I)
 TYPE_ALT = re.compile(r"alternan(ce|t)|apprenti(e|ssage)?\b|work.?study|contrat de pro", re.I)
@@ -279,7 +279,7 @@ def verification(st, premiere):
                 tg_msg("⚠️ Chercheur d'offres : quota gratuit Gemini du jour épuisé, les CV reprennent demain matin.")
             break
         traitees += 1
-        if a.get("type") not in ("stage", "alternance") or not a.get("pertinent") or int(a.get("score", 0) or 0) < 8:
+        if a.get("type") not in ("stage", "alternance") or not a.get("pertinent") or int(a.get("score", 0) or 0) < 7:
             log("Hors sujet :", o["titre"]); journal(st, f"IA score {a.get('score')} {a.get('type')}", o); continue
         if "france" not in (a.get("pays", "") + " " + o["lieu"]).lower():
             log("Hors France :", o["titre"], o["lieu"]); journal(st, "hors France", o); continue
