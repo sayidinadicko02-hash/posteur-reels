@@ -63,10 +63,14 @@ def chercher(mots, lieu, periode, stage=True, start=0):
     params = {"keywords": mots, "location": lieu, "f_TPR": periode, "start": start}
     if stage: params["f_JT"] = "I"
     url = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?" + urllib.parse.urlencode(params)
-    r = requests.get(url, headers=UA, timeout=30)
+    for essai in range(3):                        # LinkedIn limite fort les serveurs GitHub : on ralentit au lieu d'abandonner
+        r = requests.get(url, headers=UA, timeout=30)
+        if r.status_code != 429: break
+        attente = 45 * (essai + 1) + random.uniform(0, 15)
+        log(f"LinkedIn 429 : nouvel essai dans {attente:.0f} s"); time.sleep(attente)
     if r.status_code == 429:
-        BLOQUE["jusqua"] = time.time() + 300
-        log(f"::warning::LinkedIn 429 (trop de requêtes) : pause de 5 min"); return []
+        BLOQUE["jusqua"] = time.time() + 240
+        log(f"::warning::LinkedIn 429 persistant : pause de 4 min"); return []
     if r.status_code != 200:
         log(f"::warning::LinkedIn {r.status_code} {mots} {lieu}"); return []
     soup = BeautifulSoup(r.text, "html.parser"); out = []
@@ -120,7 +124,11 @@ def description(jid):
     return description_linkedin(jid)
 
 def description_linkedin(jid):
-    r = requests.get(f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{jid}", headers=UA, timeout=30)
+    for essai in range(2):
+        time.sleep(random.uniform(3, 6))
+        r = requests.get(f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{jid}", headers=UA, timeout=30)
+        if r.status_code != 429: break
+        time.sleep(40 + random.uniform(0, 20))
     if r.status_code != 200: return ""
     soup = BeautifulSoup(r.text, "html.parser")
     d = soup.select_one(".show-more-less-html__markup") or soup.select_one(".description__text")
@@ -348,7 +356,7 @@ def verification(st, premiere):
                 cle = (o["titre"] + "|" + o["entreprise"]).lower()   # même offre republiée sous un autre numéro
                 if o["id"] in vues or cle in cles or deja_envoyee(o, st): continue
                 nouvelles[o["id"]] = o
-            time.sleep(random.uniform(3, 7))
+            time.sleep(random.uniform(10, 18))            # LinkedIn : lentement, sinon blocage 429
             if len(res) < 10: break                       # plus de résultats pour cette recherche
         for page in (1, 2):                               # même recherche sur HelloWork
             res = chercher_hw(mots, stage, page)
