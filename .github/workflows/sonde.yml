@@ -1,0 +1,16 @@
+name: Sonde sites emploi
+on:
+  push:
+    branches: [sonde]
+    paths: [sonde/sonde.py]
+permissions:
+  contents: write
+jobs:
+  s:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install requests && python sonde/sonde.py
+      - run: |
+          git config user.name bot; git config user.email bot@users.noreply.github.com
+          git add sonde/out && git commit -qm sonde && git push -q
