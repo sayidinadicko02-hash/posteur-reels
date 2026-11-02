@@ -228,6 +228,11 @@ def deja_envoyee(o, st):
         if m2 and len(m & m2) / len(m | m2) >= 0.6: return True
     return False
 
+def journal(st, raison, o):
+    """Garde les 300 derniers rejets (raison + titre) dans vues.json pour comprendre ce qui est filtré."""
+    st.setdefault("rejets", []).append([datetime.datetime.now().strftime("%d/%m %H:%M"), raison, o["titre"], o["entreprise"]])
+    st["rejets"] = st["rejets"][-300:]
+
 def nettoie(s): return re.sub(r"[^A-Za-z0-9]+", "_", s)[:40].strip("_")
 
 def verification(st, premiere):
@@ -257,12 +262,12 @@ def verification(st, premiere):
         if traitees >= MAX_OFFRES or envoyes >= quota: break
         st["vues"].append(o["id"])
         desc = description(o["id"])
-        if not desc: continue
+        if not desc: journal(st, "description vide", o); continue
         if not dans_domaine(o, desc):
-            log("Hors domaine (mots-clés) :", o["titre"]); continue
+            log("Hors domaine (mots-clés) :", o["titre"]); journal(st, "titre/mots-clés", o); continue
         genre = type_offre(o, desc)
         if not genre:
-            log("Pas un stage ni une alternance :", o["titre"]); continue
+            log("Pas un stage ni une alternance :", o["titre"]); journal(st, "pas stage/alternance", o); continue
         time.sleep(7)                                   # reste sous la limite gratuite par minute
         try:
             a = adapter(o, desc)
@@ -275,9 +280,9 @@ def verification(st, premiere):
             break
         traitees += 1
         if a.get("type") not in ("stage", "alternance") or not a.get("pertinent") or int(a.get("score", 0) or 0) < 8:
-            log("Hors sujet :", o["titre"]); continue
+            log("Hors sujet :", o["titre"]); journal(st, f"IA score {a.get('score')} {a.get('type')}", o); continue
         if "france" not in (a.get("pays", "") + " " + o["lieu"]).lower():
-            log("Hors France :", o["titre"], o["lieu"]); continue
+            log("Hors France :", o["titre"], o["lieu"]); journal(st, "hors France", o); continue
         nom = f"{nettoie(o['entreprise'])}_{o['id']}"
         cv, lm = f"/tmp/CV_Sayidina_Dicko_{nom}.pdf", f"/tmp/Lettre_Sayidina_Dicko_{nom}.pdf"
         ville, cp, pays = a.get("ville", ""), a.get("code_postal", ""), a.get("pays", "")
