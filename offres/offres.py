@@ -29,7 +29,7 @@ RECHERCHES_ALT = [         # alternances : LinkedIn ne les classe pas en "stage"
 ]
 LIEUX = ["France"]
 PAR_PASSAGE = 5          # recherches LinkedIn par vérification (on tourne dans la liste)
-PAGES = 4                # pages de résultats lues par recherche (10 offres par page)
+PAGES = 2                # pages LinkedIn lues par recherche (10 offres par page ; au-delà LinkedIn bloque)
 MAX_OFFRES = 10          # offres analysées max par vérification
 MAX_PAR_HEURE = 60       # jusqu'à 10 CV par passage, 6 passages par heure
 ECART_MIN = 10           # minutes entre deux vérifications
@@ -133,7 +133,7 @@ def gemini(prompt):
     for m in MODELES:
         for essai in range(3):
             r = requests.post(f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent",
-                              params={"key": key}, timeout=120,
+                              params={"key": key}, timeout=75,
                               json={"contents": [{"parts": [{"text": prompt}]}],
                                     "generationConfig": {"responseMimeType": "application/json", "temperature": 0.4}})
             if r.status_code == 200:
@@ -203,10 +203,30 @@ def charger():
     return st
 
 def sauver(st):
-    st["vues"] = st["vues"][-5000:]; st["cles"] = st["cles"][-5000:]
-    json.dump(st, open(VUES, "w"))
-    subprocess.run("git add offres/vues.json && git commit -qm 'Offres vues' && git pull -q --rebase && git push -q",
-                   shell=True, cwd=os.path.dirname(ICI))
+    """Enregistre l'état et le pousse sur GitHub. Si un autre passage a modifié vues.json entre-temps,
+    on FUSIONNE les deux versions (union des listes) au lieu de faire un rebase qui peut bloquer en conflit."""
+    racine = os.path.dirname(ICI)
+    sh = lambda c: subprocess.run(c, shell=True, cwd=racine, capture_output=True, text=True)
+    sh("git rebase --abort; git merge --abort; git checkout -q -B main")
+    for _ in range(4):
+        sh("git fetch -q origin main")
+        try:
+            distant = json.loads(sh("git show origin/main:offres/vues.json").stdout or "{}")
+        except Exception:
+            distant = {}
+        for k in ("vues", "cles", "rejets"):
+            vus = set(); fus = []
+            for x in distant.get(k, []) + st.get(k, []):
+                cle = json.dumps(x, ensure_ascii=False)
+                if cle not in vus: vus.add(cle); fus.append(x)
+            st[k] = fus
+        st["vues"] = st["vues"][-6000:]; st["cles"] = st["cles"][-6000:]; st["rejets"] = st.get("rejets", [])[-300:]
+        sh("git reset -q --hard origin/main")
+        json.dump(st, open(VUES, "w"))
+        sh("git add offres/vues.json && git commit -qm 'Offres vues'")
+        if sh("git push -q origin HEAD:main").returncode == 0: return
+        time.sleep(5)
+    log("::warning::Sauvegarde de vues.json impossible (on réessaiera au prochain passage)")
 
 MOTS_DOMAINE = ["microélectron", "microelectron", "asic", "fpga", "vhdl", "verilog", "systemverilog", "vlsi", "rtl",
     "analog", "analogique", "circuit", "semi-conduct", "semiconduct", "silicium", "silicon", "layout", "cadence", "synopsys",
@@ -223,11 +243,11 @@ TITRE_EXCLU = re.compile(r"cyber|lean|amélioration continue|qualité|quality|"
                          r"gnc|guidance|navigation|iot|supervision|exploitation|data|cloud|web|devops|réseau|network|"
                          r"marketing|commercial|achat|supply|méthodes|production|maintenance|mécani|asservissement|"
                          r"media|methodology|automation|architect(?!ure (?:num|matériel|hardware))|systems engineering|"
-                         r"graph neural|haptic|photoni|gnss|radar", re.I)
+                         r"graph neural|haptic|photoni|gnss|radar|graphi|webdesign|ux|ui designer", re.I)
 
 def dans_domaine(o, desc):
     titre = o["titre"]
-    if TITRE_EXCLU.search(titre) or not TITRE_CIBLE.search(titre): return False
+    if TITRE_EXCLU.search(titre): return False
     if re.search(r"logiciel|software", titre, re.I) and not re.search(r"embarqu|embedded|firmware", titre, re.I): return False
     t = (" " + titre + " " + desc + " ").lower()
     return sum(m in t for m in MOTS_DOMAINE) >= 2
@@ -309,7 +329,7 @@ def verification(st, premiere):
         if traitees >= MAX_OFFRES or envoyes >= quota: break
         st["vues"].append(o["id"])
         desc = description(o["id"])
-        if not desc: journal(st, "description vide", o); continue
+        if not desc: st["vues"].remove(o["id"]); continue          # réessayée au prochain passage
         if not dans_domaine(o, desc):
             log("Hors domaine (mots-clés) :", o["titre"]); journal(st, "titre/mots-clés", o); continue
         genre = type_offre(o, desc)
@@ -319,7 +339,10 @@ def verification(st, premiere):
         try:
             a = adapter(o, desc)
         except Exception as ex:
-            log(f"::warning::Gemini KO {ex}"); st["vues"].remove(o["id"])
+            log(f"::warning::Gemini KO {str(ex)[:300]}"); st["vues"].remove(o["id"])
+            if "PerDay" not in str(ex):
+                erreurs_ia = st.setdefault("_erreurs_ia", 0) + 1; st["_erreurs_ia"] = erreurs_ia
+                if erreurs_ia % 3: continue           # erreur passagère (délai, surcharge) : on passe à l'offre suivante
             jour = datetime.date.today().isoformat()
             if "PerDay" in str(ex) and st.get("alerte_quota") != jour:
                 st["alerte_quota"] = jour
