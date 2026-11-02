@@ -436,6 +436,13 @@ def code_modifie():
 def main():
     if os.environ.get("TEST_CV") == "1":
         test_cv(); return
+    if os.environ.get("TEST_CV") == "2":                  # test de la clé Groq (secours de Gemini)
+        try:
+            r = groq('Réponds uniquement en JSON : {"ok": true, "modele": "<ton nom>"}')
+            log(f"::notice::Groq OK : {r}"); tg_msg(f"✅ Test Groq réussi : la clé fonctionne ({r}).")
+        except Exception as ex:
+            log(f"::error::Groq KO : {ex}"); tg_msg(f"❌ Test Groq échoué : {str(ex)[:300]}")
+        return
     if not (os.environ.get("CV_TEL", "").strip() and os.environ.get("CV_EMAIL", "").strip()):
         log("Secrets CV_TEL / CV_EMAIL manquants : on attend qu'ils soient ajoutés."); return
     t0 = time.time(); st = charger(); premiere = not st["vues"]
