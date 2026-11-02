@@ -80,7 +80,46 @@ def chercher(mots, lieu, periode, stage=True, start=0):
                     "lieu": l.get_text(strip=True) if l else "", "lien": (a["href"].split("?")[0] if a else f"https://www.linkedin.com/jobs/view/{jid}")})
     return out
 
+# ---------- HelloWork (pages publiques) ----------
+def chercher_hw(mots, stage=True, page=1):
+    """Offres HelloWork. mots sans 'stage'/'alternance' : le type de contrat est filtré par HelloWork."""
+    mots = re.sub(r"\b(stage|alternance|apprentissage|internship)\b", "", mots, flags=re.I).strip() or mots
+    params = {"k": mots, "c": "Stage" if stage else "Alternance", "p": page}
+    try:
+        r = requests.get("https://www.hellowork.com/fr-fr/emploi/recherche.html", params=params, headers=UA, timeout=30)
+    except Exception as ex:
+        log("HelloWork KO", ex); return []
+    if r.status_code != 200:
+        log(f"::warning::HelloWork {r.status_code} {mots}"); return []
+    soup = BeautifulSoup(r.text, "html.parser"); out = []
+    for a in soup.select('a[data-cy="offerTitle"]'):
+        m = re.search(r"/emplois/(\d+)\.html", a.get("href", ""))
+        if not m: continue
+        spans = a.select("h3 span")
+        titre = spans[0].get_text(strip=True) if spans else a.get("title", "")
+        ent = spans[1].get_text(strip=True) if len(spans) > 1 else ""
+        carte = a.find_parent(attrs={"data-cy": "serpCard"})
+        lieu = carte.select_one('[data-cy="localisationCard"]') if carte else None
+        out.append({"id": "hw" + m.group(1), "titre": titre, "entreprise": ent,
+                    "lieu": (lieu.get_text(strip=True) + ", France") if lieu else "France",
+                    "lien": f"https://www.hellowork.com/fr-fr/emplois/{m.group(1)}.html"})
+    return out
+
+def description_hw(num):
+    r = requests.get(f"https://www.hellowork.com/fr-fr/emplois/{num}.html", headers=UA, timeout=30)
+    if r.status_code != 200: return ""
+    t = BeautifulSoup(r.text, "html.parser").get_text("\n", strip=True)
+    i = t.find("Détail du poste")
+    if i < 0: i = t.find("Les missions du poste")
+    if i < 0: return ""
+    fins = [k for k in (t.find(m, i + 50) for m in ("Postuler", "Créer une alerte", "Ces offres pourraient", "Voir moins")) if k > 0]
+    return t[i:min(fins) if fins else i + 9000][:9000]
+
 def description(jid):
+    if str(jid).startswith("hw"): return description_hw(str(jid)[2:])
+    return description_linkedin(jid)
+
+def description_linkedin(jid):
     r = requests.get(f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{jid}", headers=UA, timeout=30)
     if r.status_code != 200: return ""
     soup = BeautifulSoup(r.text, "html.parser")
@@ -256,6 +295,14 @@ def verification(st, premiere):
                 nouvelles[o["id"]] = o
             time.sleep(random.uniform(3, 7))
             if len(res) < 10: break                       # plus de résultats pour cette recherche
+        for page in (1, 2):                               # même recherche sur HelloWork
+            res = chercher_hw(mots, stage, page)
+            for o in res:
+                cle = (o["titre"] + "|" + o["entreprise"]).lower()
+                if o["id"] in vues or cle in cles or deja_envoyee(o, st): continue
+                nouvelles[o["id"]] = o
+            time.sleep(random.uniform(2, 4))
+            if len(res) < 20: break
     log(f"::notice::{len(nouvelles)} nouvelle(s) offre(s) sur {len(lot)} recherches")
     traitees = 0; envoyes = 0
     for o in list(nouvelles.values()):
