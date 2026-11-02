@@ -317,7 +317,8 @@ def code_modifie():
     racine = os.path.dirname(ICI)
     try:
         subprocess.run("git fetch -q origin main", shell=True, cwd=racine, timeout=60)
-        r = subprocess.run("git diff --quiet HEAD origin/main -- offres/offres.py offres/documents.py", shell=True, cwd=racine)
+        depart = os.environ.get("GITHUB_SHA") or "HEAD"          # version du code au lancement (HEAD bouge avec les git pull)
+        r = subprocess.run(f"git diff --quiet {depart} origin/main -- offres/offres.py offres/documents.py", shell=True, cwd=racine)
         return r.returncode == 1
     except Exception:
         return False
