@@ -1,10 +1,8 @@
-import requests, os, re
-UA={"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36","Accept-Language":"fr-FR,fr;q=0.9"}
+import requests, os
 os.makedirs("sonde/out",exist_ok=True)
-sc="DPwIYReAYR7"; out=[]
-for n,u in [("embed","https://www.instagram.com/reel/%s/embed/captioned/"%sc),("page","https://www.instagram.com/reel/%s/"%sc)]:
-    t=requests.get(u,headers=UA,timeout=30).text; out.append(f"== {n} {len(t)}")
-    for k in ["username","owner","video_view_count","video_play_count","play_count","view_count","comment_count","edge_media_to_comment","edge_followed_by","follower_count","og:description","og:title","EmbeddedMedia","Caption","commentCount","likeCount","UserInteractionCount"]:
-        for m in list(re.finditer(re.escape(k),t))[:3]:
-            out.append(f"{n} {k}: {t[max(0,m.start()-80):m.start()+220]!r}")
-open("sonde/out/ig_extrait.txt","w").write("\n".join(out))
+U={"l1":"https://elevenlabsusercontent.com/database/workspace/d0938ae23dd24dbdbb8a3ce1540d3773/content_generation/g1VUQS2mhoYm4ndcjoRb/GSsCz1pirztsRX6x0mSf/content.mp3?Expires=1793732400&KeyName=assets-cdn-key-1&Signature=MQShxoBPMKa39EqhU6D5qqtA8Lg=",
+"l2":"https://elevenlabsusercontent.com/database/workspace/d0938ae23dd24dbdbb8a3ce1540d3773/content_generation/64W1zXGvxU5xHIZdVDfb/QwpBo4g3MNuRyWnKyrVL/content.mp3?Expires=1793732400&KeyName=assets-cdn-key-1&Signature=NcTj7NUds6Pwe4lRauBEyzSc3po=",
+"l3":"https://elevenlabsusercontent.com/database/workspace/d0938ae23dd24dbdbb8a3ce1540d3773/content_generation/HhOcK1wfK6kElnSZHEse/fXoCRlIzyKIqCUeFHSJp/content.mp3?Expires=1793732400&KeyName=assets-cdn-key-1&Signature=rIzWg5W7ESuTo-LoV0KnpmGuj2A=",
+"l4":"https://elevenlabsusercontent.com/database/workspace/d0938ae23dd24dbdbb8a3ce1540d3773/content_generation/6zzHBmzWsXAExAAJFAdA/bFd3bFagDBDUnsNF7Ri0/content.mp3?Expires=1793732400&KeyName=assets-cdn-key-1&Signature=fusjS5-4rslr5V1z1tas2ZbhtGs="}
+for k,u in U.items():
+    r=requests.get(u,timeout=60); print(k,r.status_code,len(r.content)); open(f"sonde/out/{k}.mp3","wb").write(r.content)
