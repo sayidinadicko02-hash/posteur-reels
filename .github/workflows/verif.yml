@@ -1,0 +1,13 @@
+name: verif-lien
+on:
+  push:
+    branches: [verif]
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -sSL -A "Mozilla/5.0" -o k.pdf -w "HTTP %{http_code} %{content_type} %{size_download}\n" "https://www.dropbox.com/scl/fi/cp25u1yregz0df17yn836/Kit_demarrage_IDEE.pdf?rlkey=qxxuzkbos0au0oit0ihkitsom&st=38yxl8qx&dl=1"
+          file k.pdf; sha256sum k.pdf
+          curl -sSL -A "Mozilla/5.0" -o p.html -w "PAGE %{http_code} %{size_download}\n" "https://www.dropbox.com/scl/fi/cp25u1yregz0df17yn836/Kit_demarrage_IDEE.pdf?rlkey=qxxuzkbos0au0oit0ihkitsom&st=38yxl8qx&dl=0"
+          grep -o '<title>[^<]*' p.html | head -1
