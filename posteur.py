@@ -17,7 +17,7 @@ import requests
 DOSSIER_A_POSTER = "/A_POSTER"
 DOSSIER_ERREURS = "/ERREURS"
 DOSSIER_PUBLIES = "/PUBLIES"
-ECART_MINUTES = 10            # temps entre deux publications
+ECART_MINUTES = 20            # temps entre deux publications
 HEURES_PUBLICATION = (0, 24)  # plage horaire de publication (heure de Paris) ; (0, 24) = à toute heure
 IG_VERSION = "v26.0"
 EXTENSIONS = (".mp4", ".mov")
