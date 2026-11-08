@@ -133,6 +133,7 @@ def main():
     traites = set(state.get("traites", []))
     renouveler_jeton(state)
 
+    log(f"Jeton : {len(TOK)} caractères, commence par {TOK[:3]!r}")
     moi = get("me", fields="user_id,username,id")
     moi_id, moi_nom = str(moi.get("user_id") or moi["id"]), moi["username"].lower()
     ids_moi = {str(moi.get("user_id", "")), str(moi.get("id", ""))}
