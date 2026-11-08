@@ -132,6 +132,16 @@ def mot_cle(caption):
 def contient(texte, mot):
     return re.search(r"(?<![A-Z0-9])" + re.escape(norm(mot)) + r"S?(?![A-Z0-9])", norm(texte)) is not None
 
+def prenom(igsid, user):
+    """Prénom affiché sur Instagram (ex. « Théo Galais » -> « Théo »), sinon le pseudo."""
+    try:
+        nom = get(str(igsid), fields="name").get("name", "").strip()
+        if nom:
+            return nom.split()[0]
+    except Exception as e:
+        log("Nom introuvable", user, str(e)[:120])
+    return user
+
 class Robot:
     def __init__(self):
         cfg = json.load(open(CONFIG_FILE, encoding="utf-8"))
@@ -190,7 +200,8 @@ class Robot:
                     post(f"{IG_ID}/messages", recipient={"id": conv["id"]}, message={"text": texte})
                     if cfg.get("relance"):
                         time.sleep(random.uniform(2, 3))   # 2e message séparé, pour qu'il le voie bien
-                        post(f"{IG_ID}/messages", recipient={"id": conv["id"]}, message={"text": cfg["relance"]})
+                        post(f"{IG_ID}/messages", recipient={"id": conv["id"]},
+                             message={"text": cfg["relance"].replace("{prenom}", prenom(conv["id"], user))})
                     self.attente.pop(qui); self.change = True
                     self.compte["guides"].append("@" + user)
                     log("Guide envoyé à", user)
