@@ -353,6 +353,15 @@ def relancer_sans_question(r):
     nb_guide = sum(1 for c in r.convs.values() if any(any(l in m for l in liens) or "guide" in m.lower() for m in c["miens"]))
     nb_q = sum(1 for c in r.convs.values() if any(any(k in m.lower() for k in ("un business ou", "explores", "te lancer")) for m in c["miens"]))
     log(f"Stats : {len(r.convs)} conversations lues, {nb_guide} avec guide, {nb_q} avec question")
+    import collections
+    cnt = collections.Counter()
+    for c in r.convs.values():
+        for m in c["miens"]:
+            ml = m.lower()
+            if any(k in ml for k in ("un business ou", "explores", "te lancer")):
+                cnt[m[:70]] += 1
+    for k, v in cnt.most_common(8):
+        log("QMSG", v, "|", k.replace("\n", " "))
     log(f"Relance : {len(a_faire)} possibles, {len(hors_delai)} hors délai (pas écrit depuis +24 h)")
     log("A_FAIRE :", ", ".join(a_faire))
     log("HORS_DELAI :", ", ".join(hors_delai))
