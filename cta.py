@@ -1,33 +1,40 @@
 """
-Robot CTA : répond tout seul aux commentaires « mot-clé » sur TOUS les posts Instagram.
+Robot CTA : répond (presque) instantanément aux commentaires « mot-clé » sur TOUS les posts Instagram.
 
 Pour chaque post, le mot-clé est lu dans la description : Commente "IDÉE"  ->  IDÉE.
-Le message et le lien de chaque mot-clé sont dans cta.json.
-Pour chaque commentaire qui contient le mot-clé :
-  - on saute si c'est toi, si tu as déjà répondu sous le commentaire,
-    si tu lui as déjà envoyé le guide en DM, ou si le robot l'a déjà traité ;
-  - sinon : DM privé avec une QUESTION (« je te l'envoie ? ») + réponse publique ;
-  - au passage suivant, s'il a répondu au DM : on envoie le guide. Sinon rien (filtre).
-Récap envoyé sur Telegram.
+Le texte et le lien de chaque mot-clé sont dans cta.json.
 
-Secrets : IG_TOKEN_CTA, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (GH_PAT optionnel pour renouveler le jeton)
-Mode test (TEST=1) : n'envoie rien, liste seulement ce qui serait fait.
+1) Quelqu'un commente le mot-clé -> DM « Je te l'envoie ? » + réponse « Regarde tes DM » sous le commentaire.
+   (on saute : toi-même, ceux à qui tu as déjà répondu ou déjà envoyé le guide, une seule fois par personne)
+2) Il répond au DM -> on lui envoie tout de suite le guide + « T'as déjà un business ou t'aimerais te lancer ? »
+3) Il ne répond pas -> rien (filtre). Oublié au bout de 7 jours.
+
+Le script tourne en boucle (vérification toutes les 15 s) pendant ~5 h 45, puis GitHub le relance.
+L'état (qui a été contacté) est rangé dans Dropbox /ROBOT_CTA/etat.json, pas sur GitHub (dépôt public).
+
+Secrets : IG_TOKEN_CTA, DROPBOX_APP_KEY, DROPBOX_APP_SECRET, DROPBOX_REFRESH_TOKEN,
+          TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+Mode test (TEST=1) : un seul passage, rien n'est envoyé.
 """
-import os, re, json, time, random, datetime, unicodedata, subprocess
+import os, re, json, time, random, datetime, unicodedata
 import requests
 
 IG = "https://graph.facebook.com/v26.0"   # clé « connexion unifiée » (EAB…)
 IG_ID = "17841415914105749"               # id Instagram de @sayidina.automatise
-STATE_FILE = "cta_state.json"
+MOI = "sayidina.automatise"
 CONFIG_FILE = "cta.json"
-JOURS_POSTS = 30          # posts publiés il y a moins de 30 jours
-MAX_ENVOIS = 15           # questions max par passage (toutes les 10 min) pour ne pas être bloqué
-PAUSE = (10, 25)          # secondes entre deux envois (pour rester naturel)
+ETAT_DROPBOX = "/ROBOT_CTA/etat.json"
+JOURS_POSTS = 30          # on surveille les posts de moins de 30 jours
+INTERVALLE = 15           # secondes entre deux vérifications
+DUREE_MAX = 5 * 3600 + 45 * 60
+MAX_PAR_MINUTE = 6        # questions max par minute (anti-blocage Instagram)
+PAUSE = (3, 7)            # secondes entre deux envois
 TEST = os.environ.get("TEST", "0") == "1"
 TOK = os.environ["IG_TOKEN_CTA"].strip()
-NOW = datetime.datetime.now(datetime.timezone.utc)
 
-def log(*a): print(*a, flush=True)
+def log(*a): print(time.strftime("%H:%M:%S"), *a, flush=True)
+def now(): return datetime.datetime.now(datetime.timezone.utc)
+def date(s): return datetime.datetime.strptime(s, "%Y-%m-%dT%H:%M:%S%z")
 
 def tg(text):
     try:
@@ -39,13 +46,9 @@ def tg(text):
 
 def norm(s):
     s = unicodedata.normalize("NFD", s or "")
-    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
-    return s.upper()
+    return "".join(c for c in s if unicodedata.category(c) != "Mn").upper()
 
-def date(s):
-    return datetime.datetime.strptime(s, "%Y-%m-%dT%H:%M:%S%z")
-
-# ---------- API Instagram ----------
+# ---------- Instagram ----------
 def get(path, **params):
     params["access_token"] = TOK
     r = requests.get(f"{IG}/{path}", params=params, timeout=60)
@@ -67,38 +70,42 @@ def get_all(path, limit_pages=20, **params):
     return out
 
 def post(path, **payload):
-    r = requests.post(f"{IG}/{path}", json=payload,
-                      headers={"Authorization": f"Bearer {TOK}"}, timeout=60)
+    r = requests.post(f"{IG}/{path}", json=payload, headers={"Authorization": f"Bearer {TOK}"}, timeout=60)
     if r.status_code != 200:
         raise RuntimeError(f"POST {path} -> {r.status_code} {r.text[:300]}")
     return r.json()
 
-# ---------- Jeton ----------
-def renouveler_jeton(state):
-    global TOK
-    if not TOK.startswith("IG"):
-        return   # clé unifiée : pas de renouvellement ici, alerte si elle expire
-    last = state.get("last_refresh", "")
-    if last and (datetime.date.today() - datetime.date.fromisoformat(last)).days < 7:
+# ---------- Dropbox (état) ----------
+_dbx = {"tok": None, "t": 0}
+def dbx_tok():
+    if not _dbx["tok"] or time.time() - _dbx["t"] > 3 * 3600:
+        r = requests.post("https://api.dropboxapi.com/oauth2/token",
+                          data={"grant_type": "refresh_token", "refresh_token": os.environ["DROPBOX_REFRESH_TOKEN"].strip()},
+                          auth=(os.environ["DROPBOX_APP_KEY"].strip(), os.environ["DROPBOX_APP_SECRET"].strip()), timeout=30)
+        r.raise_for_status()
+        _dbx.update(tok=r.json()["access_token"], t=time.time())
+    return _dbx["tok"]
+
+def charger_etat():
+    r = requests.post("https://content.dropboxapi.com/2/files/download",
+                      headers={"Authorization": f"Bearer {dbx_tok()}",
+                               "Dropbox-API-Arg": json.dumps({"path": ETAT_DROPBOX})}, timeout=60)
+    if r.status_code == 409:
+        return {}
+    r.raise_for_status()
+    return r.json()
+
+def sauver_etat(state):
+    if TEST:
         return
     try:
-        r = requests.get("https://graph.instagram.com/refresh_access_token",
-                         params={"grant_type": "ig_refresh_token", "access_token": TOK}, timeout=30)
+        r = requests.post("https://content.dropboxapi.com/2/files/upload",
+                          headers={"Authorization": f"Bearer {dbx_tok()}", "Content-Type": "application/octet-stream",
+                                   "Dropbox-API-Arg": json.dumps({"path": ETAT_DROPBOX, "mode": "overwrite", "mute": True})},
+                          data=json.dumps(state, ensure_ascii=False).encode(), timeout=60)
         r.raise_for_status()
-        new = r.json()["access_token"]
-        state["last_refresh"] = datetime.date.today().isoformat()
-        if os.environ.get("GH_PAT") and not TEST:
-            subprocess.run(["gh", "secret", "set", "IG_TOKEN_CTA", "--body", new],
-                           env={**os.environ, "GH_TOKEN": os.environ["GH_PAT"]}, check=True)
-            log("Jeton renouvelé et enregistré.")
-        else:
-            jours = r.json().get("expires_in", 0) // 86400
-            if jours < 10:
-                tg(f"⚠️ Robot CTA : ton jeton Instagram expire dans {jours} jours. "
-                   "Génère-en un nouveau et remplace le secret IG_TOKEN_CTA.")
-        TOK = new
     except Exception as e:
-        log("Renouvellement du jeton KO :", e)
+        log("Sauvegarde état KO", e)
 
 # ---------- Logique ----------
 RE_MOT = re.compile(r'comment\w*\s*(?:le mot\s*)?["“«]\s*([^"”»]+?)\s*["”»]', re.I)
@@ -110,151 +117,183 @@ def mot_cle(caption):
 def contient(texte, mot):
     return re.search(r"(?<![A-Z0-9])" + re.escape(norm(mot)) + r"S?(?![A-Z0-9])", norm(texte)) is not None
 
-def lire_dm(ids_moi):
-    """pseudo -> {"id": id de la personne, "miens": [mes textes], "leurs": [(date, texte)]}"""
-    convs = {}
-    try:
-        data = get_all(f"{IG_ID}/conversations", limit_pages=10, platform="instagram",
-                       fields="participants,messages.limit(25){from,message,created_time}")
-    except Exception as e:
-        log("Lecture des DM impossible :", e)
-        return convs
-    for c in data:
-        autres = [p for p in c.get("participants", {}).get("data", []) if str(p.get("id")) not in ids_moi]
-        msgs = c.get("messages", {}).get("data", [])
-        for p in autres:
-            d = convs.setdefault(p.get("username", "").lower(), {"id": p.get("id"), "miens": [], "leurs": []})
-            for m in msgs:
-                if str(m.get("from", {}).get("id")) in ids_moi:
-                    d["miens"].append(m.get("message", ""))
-                else:
-                    d["leurs"].append((m.get("created_time", ""), m.get("message", "")))
-    return convs
+class Robot:
+    def __init__(self):
+        cfg = json.load(open(CONFIG_FILE, encoding="utf-8"))
+        self.reponses = cfg.pop("_reponses_publiques", ["Regarde tes DM 📩"])
+        self.ctas = {norm(k): (k, v) for k, v in cfg.items()}
+        self.state = charger_etat()
+        self.traites = set(self.state.get("traites", []))
+        self.personnes = set(self.state.get("personnes", []))
+        self.attente = self.state.get("attente", {})
+        self.convs = {}            # pseudo -> {"id", "miens": [...], "leurs": [(date, texte)]}
+        self.nb_comments = {}      # post -> nombre de commentaires déjà traités
+        self.envois = []           # horodatages des questions (limite par minute)
+        self.sans_lien = set()
+        self.compte = {"questions": [], "guides": []}
+        self.change = False
 
-def main():
-    config = json.load(open(CONFIG_FILE, encoding="utf-8"))
-    reponses = config.pop("_reponses_publiques", ["Je t'ai écrit en DM 📩"])
-    ctas = {norm(k): (k, v) for k, v in config.items()}
-    state = json.load(open(STATE_FILE)) if os.path.exists(STATE_FILE) else {}
-    traites = set(state.get("traites", []))
-    personnes = set(state.get("personnes", []))   # "pseudo|MOTCLE" déjà contactés : un seul DM par personne et par CTA
-    attente = state.get("attente", {})            # "pseudo|MOTCLE" -> {"t": date de la question}
-    renouveler_jeton(state)
+    def lire_dm(self, pages):
+        try:
+            data = get_all(f"{IG_ID}/conversations", limit_pages=pages, platform="instagram", limit=25,
+                           fields="participants,messages.limit(15){from,message,created_time}")
+        except Exception as e:
+            log("Lecture DM KO", e); return
+        for c in data:
+            autres = [p for p in c.get("participants", {}).get("data", []) if str(p.get("id")) != IG_ID]
+            msgs = c.get("messages", {}).get("data", [])
+            for p in autres:
+                user = p.get("username", "").lower()
+                d = {"id": p.get("id"), "miens": [], "leurs": []}
+                for m in msgs:
+                    if str(m.get("from", {}).get("id")) == IG_ID:
+                        d["miens"].append(m.get("message", ""))
+                    else:
+                        d["leurs"].append((m.get("created_time", ""), m.get("message", "")))
+                ancien = self.convs.get(user)
+                if ancien:   # on garde aussi les messages déjà lus
+                    d["miens"] = list(dict.fromkeys(d["miens"] + ancien["miens"]))
+                    d["leurs"] = list(dict.fromkeys(d["leurs"] + ancien["leurs"]))
+                self.convs[user] = d
 
-    try:
-        moi = get(IG_ID, fields="id,username")
-    except RuntimeError as e:
-        if "190" in str(e):
-            tg("⚠️ Robot CTA : ta clé Instagram ne marche plus (expirée ?). Génère-en une nouvelle et remplace le secret IG_TOKEN_CTA.")
-        raise
-    moi_nom = moi["username"].lower()
-    ids_moi = {IG_ID}
-    log("Compte :", moi_nom)
+    def envoyer_guides(self):
+        for qui, info in list(self.attente.items()):
+            user, cle = qui.split("|", 1)
+            if cle not in self.ctas:
+                self.attente.pop(qui); self.change = True; continue
+            _, cfg = self.ctas[cle]
+            conv, t0 = self.convs.get(user), date(info["t"])
+            if conv and any(dt and date(dt) > t0 for dt, _ in conv["leurs"]):
+                texte = cfg["message"].replace("{lien}", cfg["lien"])
+                if TEST:
+                    log("[test] guide pour", user); continue
+                try:
+                    post(f"{IG_ID}/messages", recipient={"id": conv["id"]}, message={"text": texte})
+                    self.attente.pop(qui); self.change = True
+                    self.compte["guides"].append("@" + user)
+                    log("Guide envoyé à", user)
+                    time.sleep(random.uniform(*PAUSE))
+                except Exception as e:
+                    log("Guide KO", user, e)
+            elif (now() - t0).days >= 7:
+                self.attente.pop(qui); self.change = True
 
-    convs = lire_dm(ids_moi)
-    stats = {"questions": 0, "guides": 0, "deja": 0, "trop_vieux": 0, "erreurs": 0}
-    sans_lien, details, guides = set(), [], []
+    def peut_envoyer(self):
+        t = time.time()
+        self.envois = [x for x in self.envois if t - x < 60]
+        return len(self.envois) < MAX_PAR_MINUTE
 
-    # ---- 1) Ceux qui ont RÉPONDU à la question -> on envoie le guide ----
-    for qui, info in list(attente.items()):
-        user, cle = qui.split("|", 1)
-        if cle not in ctas:
-            attente.pop(qui); continue
-        nom_cta, cfg = ctas[cle]
-        conv = convs.get(user)
-        t0 = date(info["t"])
-        if conv and any(dt and date(dt) > t0 for dt, _ in conv["leurs"]):
-            texte = cfg["message"].replace("{lien}", cfg["lien"])
-            if TEST:
-                guides.append(f"@{user}"); continue
-            try:
-                post(f"{IG_ID}/messages", recipient={"id": conv["id"]}, message={"text": texte})
-                attente.pop(qui); stats["guides"] += 1; guides.append(f"@{user}")
-                log("Guide envoyé à", user)
-                time.sleep(random.uniform(*PAUSE))
-            except Exception as e:
-                stats["erreurs"] += 1; log("Guide KO", user, e)
-        elif (NOW - t0).days >= 7:
-            attente.pop(qui)   # pas de réponse en 7 jours : on laisse tomber
-
-    # ---- 2) Nouveaux commentaires -> on pose la question en DM ----
-    medias = get_all(f"{IG_ID}/media", limit_pages=5, fields="id,caption,timestamp,permalink", limit=50)
-    for m in medias:
-        if (NOW - date(m["timestamp"])).days > JOURS_POSTS:
-            continue
-        mot = mot_cle(m.get("caption"))
-        if not mot:
-            continue
-        cle = norm(mot)
-        if cle not in ctas:
-            sans_lien.add(mot); continue
-        nom_cta, cfg = ctas[cle]
-        if not cfg.get("lien"):
-            sans_lien.add(nom_cta); continue
-
-        comments = get_all(f"{m['id']}/comments", limit_pages=20, limit=50,
+    def traiter_commentaires(self, media, nom_cta, cfg):
+        """Renvoie True si tous les commentaires du post ont été traités."""
+        cle = norm(nom_cta)
+        comments = get_all(f"{media['id']}/comments", limit_pages=20, limit=50,
                            fields="id,text,timestamp,username,from,replies{username,from}")
+        complet = True
         for c in comments:
-            cid, user = c["id"], (c.get("username") or c.get("from", {}).get("username", "")).lower()
-            if cid in traites or user == moi_nom or str(c.get("from", {}).get("id")) in ids_moi:
+            cid = c["id"]
+            user = (c.get("username") or c.get("from", {}).get("username", "")).lower()
+            if cid in self.traites or user == MOI or str(c.get("from", {}).get("id")) == IG_ID:
                 continue
             if not contient(c.get("text", ""), nom_cta):
                 continue
             reps = c.get("replies", {}).get("data", [])
-            deja_public = any((r.get("username") or r.get("from", {}).get("username", "")).lower() == moi_nom
+            deja_public = any((r.get("username") or r.get("from", {}).get("username", "")).lower() == MOI
                               for r in reps)
             deja_dm = any(any(norm(t) in norm(txt) for t in cfg.get("deja_envoye_si", []))
-                          for txt in convs.get(user, {}).get("miens", []))
+                          for txt in self.convs.get(user, {}).get("miens", []))
             qui = f"{user}|{cle}"
-            if deja_public or deja_dm or qui in personnes:
-                stats["deja"] += 1; traites.add(cid); personnes.add(qui); continue
-            if (NOW - date(c["timestamp"])).days >= 7:
-                stats["trop_vieux"] += 1; traites.add(cid); continue
-            if stats["questions"] >= MAX_ENVOIS:
-                continue
-
+            if deja_public or deja_dm or qui in self.personnes:
+                self.traites.add(cid); self.personnes.add(qui); self.change = True; continue
+            if (now() - date(c["timestamp"])).days >= 7:
+                self.traites.add(cid); self.change = True; continue
+            if not self.peut_envoyer():
+                complet = False; continue     # on reprendra au tour suivant
             if TEST:
-                details.append(f"@{user} ({nom_cta})"); stats["questions"] += 1; personnes.add(qui); continue
+                log("[test] question pour", user); self.personnes.add(qui)
+                self.compte["questions"].append("@" + user); continue
             try:
                 post(f"{IG_ID}/messages", recipient={"comment_id": cid}, message={"text": cfg["accroche"]})
-                traites.add(cid); personnes.add(qui)
-                attente[qui] = {"t": NOW.strftime("%Y-%m-%dT%H:%M:%S%z")}
-                stats["questions"] += 1
-                details.append(f"@{user} ({nom_cta})")
+                self.envois.append(time.time())
+                self.traites.add(cid); self.personnes.add(qui)
+                self.attente[qui] = {"t": now().strftime("%Y-%m-%dT%H:%M:%S%z")}
+                self.change = True
+                self.compte["questions"].append("@" + user)
+                log("Question envoyée à", user)
                 try:
-                    post(f"{cid}/replies", message=random.choice(reponses))
+                    post(f"{cid}/replies", message=random.choice(self.reponses))
                 except Exception as e:
                     log("Réponse publique KO", user, e)
-                log("Question envoyée à", user)
                 time.sleep(random.uniform(*PAUSE))
             except Exception as e:
-                stats["erreurs"] += 1
-                log("Envoi KO", user, e)
+                self.traites.add(cid); self.change = True   # on ne réessaie pas en boucle
+                log("Question KO", user, e)
+        return complet
 
-    state["traites"] = sorted(traites)[-5000:]
-    state["personnes"] = sorted(personnes)
-    state["attente"] = attente
-    if not TEST:
-        json.dump(state, open(STATE_FILE, "w"), indent=1)
+    def tour(self, pages_dm=1):
+        self.lire_dm(pages_dm)
+        self.envoyer_guides()
+        medias = get(f"{IG_ID}/media", fields="id,caption,timestamp,comments_count", limit=50).get("data", [])
+        for m in medias:
+            if (now() - date(m["timestamp"])).days > JOURS_POSTS:
+                continue
+            mot = mot_cle(m.get("caption"))
+            if not mot:
+                continue
+            if norm(mot) not in self.ctas or not self.ctas[norm(mot)][1].get("lien"):
+                self.sans_lien.add(mot); continue
+            nb = m.get("comments_count", 0)
+            if self.nb_comments.get(m["id"]) == nb:
+                continue                     # rien de nouveau sur ce post
+            nom_cta, cfg = self.ctas[norm(mot)]
+            if self.traiter_commentaires(m, nom_cta, cfg):
+                self.nb_comments[m["id"]] = nb
+        if self.change:
+            self.state.update(traites=sorted(self.traites)[-5000:], personnes=sorted(self.personnes),
+                              attente=self.attente)
+            sauver_etat(self.state); self.change = False
 
-    titre = "🧪 Robot CTA (TEST, rien envoyé)" if TEST else "🤖 Robot CTA"
-    if stats["questions"] or stats["guides"] or stats["erreurs"] or TEST:
-        msg = (f"{titre}\n💬 questions envoyées : {stats['questions']}\n"
-               f"📩 guides envoyés (ont répondu) : {len(guides) if TEST else stats['guides']}\n"
-               f"⏳ en attente de réponse : {len(attente)}\n"
-               f"⏭️ déjà traités par toi : {stats['deja']}\n"
-               f"❌ erreurs : {stats['erreurs']}")
-        if guides:
-            msg += "\n\nGuide envoyé à : " + ", ".join(guides[:60])
-        if details:
-            msg += "\n\nQuestion envoyée à : " + ", ".join(details[:60])
+    def recap(self, titre):
+        q, g = self.compte["questions"], self.compte["guides"]
+        if not (q or g):
+            return
+        msg = (f"{titre}\n💬 questions envoyées : {len(q)}\n📩 guides envoyés : {len(g)}\n"
+               f"⏳ en attente de réponse : {len(self.attente)}")
+        if g: msg += "\n\nGuide envoyé à : " + ", ".join(g[:50])
+        if q: msg += "\n\nQuestion envoyée à : " + ", ".join(q[:50])
         tg(msg)
-    log(json.dumps(stats), "| attente :", len(attente), "| sans lien :", sorted(sans_lien))
-    log("Questions :", ", ".join(details)); log("Guides :", ", ".join(guides))
-    if not TEST and sans_lien and state.get("alerte_sans_lien") != sorted(sans_lien):
-        state["alerte_sans_lien"] = sorted(sans_lien)
-        json.dump(state, open(STATE_FILE, "w"), indent=1)
-        tg("⚠️ Robot CTA : mots-clés sans lien dans cta.json : " + ", ".join(sorted(sans_lien)))
+        self.compte = {"questions": [], "guides": []}
+
+def main():
+    try:
+        get(IG_ID, fields="id,username")
+    except RuntimeError as e:
+        if "190" in str(e):
+            tg("⚠️ Robot CTA : ta clé Instagram ne marche plus (expirée ?). "
+               "Génère-en une nouvelle et remplace le secret IG_TOKEN_CTA.")
+        raise
+    r = Robot()
+    if TEST:
+        r.tour(pages_dm=10)
+        log("Questions :", ", ".join(r.compte["questions"]) or "aucune")
+        r.recap("🧪 Robot CTA (TEST, rien envoyé)")
+        return
+    r.tour(pages_dm=10)          # premier tour : lit tout l'historique des DM
+    if r.sans_lien and r.state.get("alerte_sans_lien") != sorted(r.sans_lien):
+        r.state["alerte_sans_lien"] = sorted(r.sans_lien); sauver_etat(r.state)
+        tg("⚠️ Robot CTA : mots-clés sans lien dans cta.json : " + ", ".join(sorted(r.sans_lien)))
+    debut, dernier_recap = time.time(), time.time()
+    while time.time() - debut < DUREE_MAX:
+        time.sleep(INTERVALLE)
+        try:
+            r.tour()
+        except Exception as e:
+            log("Tour KO", e)
+            if "190" in str(e):
+                tg("⚠️ Robot CTA : ta clé Instagram ne marche plus. Remplace le secret IG_TOKEN_CTA."); raise
+            time.sleep(60)
+        if time.time() - dernier_recap > 3600:
+            r.recap("🤖 Robot CTA (dernière heure)"); dernier_recap = time.time()
+    r.recap("🤖 Robot CTA")
 
 if __name__ == "__main__":
     main()
