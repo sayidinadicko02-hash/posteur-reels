@@ -342,7 +342,7 @@ def relancer_sans_question(r):
             continue
         miens = conv["miens"]
         a_eu_guide = any(any(l in m for l in liens) or "guide" in m.lower() for m in miens)
-        a_eu_question = any("business" in m.lower() or "te lancer" in m.lower() or "explores" in m.lower() for m in miens)
+        a_eu_question = any(any(k in m.lower() for k in ("un business ou", "explores", "te lancer", "aimerais te lancer")) for m in miens)
         if not a_eu_guide or a_eu_question:
             continue
         dates = [date(dt) for dt, _ in conv["leurs"] if dt]
@@ -351,7 +351,7 @@ def relancer_sans_question(r):
         else:
             hors_delai.append(user)
     nb_guide = sum(1 for c in r.convs.values() if any(any(l in m for l in liens) or "guide" in m.lower() for m in c["miens"]))
-    nb_q = sum(1 for c in r.convs.values() if any("business" in m.lower() or "explores" in m.lower() for m in c["miens"]))
+    nb_q = sum(1 for c in r.convs.values() if any(any(k in m.lower() for k in ("un business ou", "explores", "te lancer")) for m in c["miens"]))
     log(f"Stats : {len(r.convs)} conversations lues, {nb_guide} avec guide, {nb_q} avec question")
     log(f"Relance : {len(a_faire)} possibles, {len(hors_delai)} hors délai (pas écrit depuis +24 h)")
     log("A_FAIRE :", ", ".join(a_faire))
