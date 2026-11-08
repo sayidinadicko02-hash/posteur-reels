@@ -6,7 +6,8 @@ Le texte et le lien de chaque mot-clé sont dans cta.json.
 
 1) Quelqu'un commente le mot-clé -> DM « Je te l'envoie ? » + réponse « Regarde tes DM » sous le commentaire.
    (on saute : toi-même, ceux à qui tu as déjà répondu ou déjà envoyé le guide, une seule fois par personne)
-2) Il répond au DM -> on lui envoie tout de suite le guide + « T'as déjà un business ou t'aimerais te lancer ? »
+2) Il répond au DM -> on lui envoie tout de suite le guide, puis 2-3 s après un 2e message :
+   « Dis-moi, t'as déjà un business ou t'aimerais te lancer ? »
 3) Il ne répond pas -> rien (filtre). Oublié au bout de 7 jours.
 
 Le script tourne en boucle (vérification toutes les 15 s) pendant ~5 h 45, puis GitHub le relance.
@@ -169,6 +170,9 @@ class Robot:
                     log("[test] guide pour", user); continue
                 try:
                     post(f"{IG_ID}/messages", recipient={"id": conv["id"]}, message={"text": texte})
+                    if cfg.get("relance"):
+                        time.sleep(random.uniform(2, 3))   # 2e message séparé, pour qu'il le voie bien
+                        post(f"{IG_ID}/messages", recipient={"id": conv["id"]}, message={"text": cfg["relance"]})
                     self.attente.pop(qui); self.change = True
                     self.compte["guides"].append("@" + user)
                     log("Guide envoyé à", user)

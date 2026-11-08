@@ -2,7 +2,8 @@
   "IDÉE": {
     "lien": "https://www.dropbox.com/scl/fi/cp25u1yregz0df17yn836/Kit_demarrage_IDEE.pdf?rlkey=qxxuzkbos0au0oit0ihkitsom&st=38yxl8qx&dl=0",
     "accroche": "Salut ! 🙌\nJ'ai vu que t'avais commenté « IDÉE » sur mon post.\n\nJ'ai préparé un guide pour tester ton idée de business avec 11 experts IA, gratuitement.\n\nJe te l'envoie ?",
-    "message": "Voici le guide 👇\n{lien}\n\nDis-moi, t'as déjà un business ou t'aimerais te lancer ?",
+    "message": "Voici le guide 👇\n{lien}",
+    "relance": "Dis-moi, t'as déjà un business ou t'aimerais te lancer ?",
     "deja_envoye_si": [
       "cp25u1yregz0df17yn836",
       "IDÉE",
@@ -12,7 +13,8 @@
   "WHATSAPP": {
     "lien": "",
     "accroche": "Salut ! 🙌\nJ'ai vu que t'avais commenté « WHATSAPP » sur mon post.\n\nJ'ai le modèle de l'agent WhatsApp prêt pour toi.\n\nJe te l'envoie ?",
-    "message": "Voici le modèle 👇\n{lien}\n\nDis-moi, t'as déjà un business ou t'aimerais te lancer ?",
+    "message": "Voici le modèle 👇\n{lien}",
+    "relance": "Dis-moi, t'as déjà un business ou t'aimerais te lancer ?",
     "deja_envoye_si": [
       "WHATSAPP"
     ]
