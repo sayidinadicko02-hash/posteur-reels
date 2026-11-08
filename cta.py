@@ -134,6 +134,7 @@ def main():
     ctas = {norm(k): (k, v) for k, v in config.items()}
     state = json.load(open(STATE_FILE)) if os.path.exists(STATE_FILE) else {}
     traites = set(state.get("traites", []))
+    personnes = set(state.get("personnes", []))   # "pseudo|MOTCLE" déjà servis : un seul DM par personne et par CTA
     renouveler_jeton(state)
 
     try:
@@ -180,8 +181,9 @@ def main():
             # déjà envoyé en DM ?
             deja_dm = any(any(norm(t) in norm(txt) for t in cfg.get("deja_envoye_si", []))
                           for txt in envoyes.get(user, []))
-            if deja_public or deja_dm:
-                stats["deja"] += 1; traites.add(cid); continue
+            qui = f"{user}|{cle}"
+            if deja_public or deja_dm or qui in personnes:
+                stats["deja"] += 1; traites.add(cid); personnes.add(qui); continue
             if (NOW - date(c["timestamp"])).days >= 7:
                 stats["trop_vieux"] += 1; traites.add(cid); continue
             if stats["envoyes"] >= MAX_ENVOIS:
@@ -189,10 +191,10 @@ def main():
 
             texte = cfg["message"].replace("{lien}", cfg["lien"])
             if TEST:
-                details.append(f"@{user} ({nom_cta})"); stats["envoyes"] += 1; continue
+                details.append(f"@{user} ({nom_cta})"); stats["envoyes"] += 1; personnes.add(qui); continue
             try:
                 post(f"{IG_ID}/messages", recipient={"comment_id": cid}, message={"text": texte})
-                traites.add(cid)
+                traites.add(cid); personnes.add(qui)
                 stats["envoyes"] += 1
                 details.append(f"@{user} ({nom_cta})")
                 try:
@@ -206,6 +208,7 @@ def main():
                 log("Envoi KO", user, e)
 
     state["traites"] = sorted(traites)[-5000:]
+    state["personnes"] = sorted(personnes)
     if not TEST:
         json.dump(state, open(STATE_FILE, "w"), indent=1)
 
@@ -221,6 +224,7 @@ def main():
             msg += "\n\n⚠️ Mots-clés sans lien dans cta.json : " + ", ".join(sorted(sans_lien))
         tg(msg)
     log(json.dumps(stats), "| sans lien :", sorted(sans_lien))
+    log("Liste :", ", ".join(details))
     if not TEST and sans_lien and state.get("alerte_sans_lien") != sorted(sans_lien):
         state["alerte_sans_lien"] = sorted(sans_lien)
         json.dump(state, open(STATE_FILE, "w"), indent=1)
