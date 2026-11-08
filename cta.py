@@ -327,17 +327,21 @@ def main():
         raise
     r = Robot()
     if os.environ.get("RATTRAPAGE") == "1":
-        # Une seule fois : envoie le guide à ceux qui ont déjà répondu, sans poser de nouvelles questions
-        for essai in range(12):
-            r.tour(pages_dm=10, commentaires=False)
-            restants = [q for q, i in r.attente.items()
-                        if r.convs.get(q.split("|")[0]) and any(dt and date(dt) > date(i["t"])
-                                                                for dt, _ in r.convs[q.split("|")[0]]["leurs"])]
-            log(f"Rattrapage : {len(r.compte['guides'])} guides envoyés, {len(restants)} restants, quota {USAGE['pct']} %")
-            if not restants:
-                break
-            time.sleep(300)
-        r.recap("🤖 Robot CTA (rattrapage)")
+        # Mode « guides seulement » (ManyChat gère les commentaires) :
+        # envoie le guide à ceux qui répondent à l'ancienne question, sans jamais poser de nouvelle question.
+        debut, n, dernier_recap = time.time(), 0, time.time()
+        while time.time() - debut < DUREE_MAX and r.attente:
+            pct = USAGE["pct"]
+            try:
+                r.tour(pages_dm=4 if n % 10 == 0 else 1, commentaires=False)
+            except Exception as e:
+                log("Tour KO", str(e)[:200]); time.sleep(240)
+            n += 1
+            log(f"Guides envoyés : {len(r.compte['guides'])} | en attente : {len(r.attente)} | quota {USAGE['pct']} %")
+            if time.time() - dernier_recap > 3600:
+                r.recap("🤖 Robot CTA (guides)"); dernier_recap = time.time()
+            time.sleep(30 if pct < 50 else 90 if pct < 80 else 300)
+        r.recap("🤖 Robot CTA (guides)")
         return
     if TEST:
         r.tour(pages_dm=10)
