@@ -326,6 +326,19 @@ def main():
                "Génère-en une nouvelle et remplace le secret IG_TOKEN_CTA.")
         raise
     r = Robot()
+    if os.environ.get("RATTRAPAGE") == "1":
+        # Une seule fois : envoie le guide à ceux qui ont déjà répondu, sans poser de nouvelles questions
+        for essai in range(12):
+            r.tour(pages_dm=10, commentaires=False)
+            restants = [q for q, i in r.attente.items()
+                        if r.convs.get(q.split("|")[0]) and any(dt and date(dt) > date(i["t"])
+                                                                for dt, _ in r.convs[q.split("|")[0]]["leurs"])]
+            log(f"Rattrapage : {len(r.compte['guides'])} guides envoyés, {len(restants)} restants, quota {USAGE['pct']} %")
+            if not restants:
+                break
+            time.sleep(300)
+        r.recap("🤖 Robot CTA (rattrapage)")
+        return
     if TEST:
         r.tour(pages_dm=10)
         log("Questions :", ", ".join(r.compte["questions"]) or "aucune")

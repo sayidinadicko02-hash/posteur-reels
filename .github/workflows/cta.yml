@@ -1,12 +1,13 @@
 name: Robot CTA
 
 on:
-  schedule:
-    - cron: "*/5 * * * *"      # relance si le robot n'est pas déjà en train de tourner
   workflow_dispatch:
     inputs:
       test:
         description: "1 = test sans rien envoyer"
+        default: "0"
+      rattrapage:
+        description: "1 = envoie seulement les guides en retard puis s'arrête"
         default: "0"
 
 concurrency:
@@ -32,4 +33,5 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TEST: ${{ github.event.inputs.test || '0' }}
+          RATTRAPAGE: ${{ github.event.inputs.rattrapage || '0' }}
         run: python cta.py
