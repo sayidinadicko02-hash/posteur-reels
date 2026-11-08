@@ -9,6 +9,8 @@ Le texte et le lien de chaque mot-clé sont dans cta.json.
 2) Il répond au DM -> on lui envoie tout de suite le guide, puis 2-3 s après un 2e message :
    « Dis-moi, t'as déjà un business ou t'aimerais te lancer ? »
 3) Il ne répond pas -> rien (filtre). Oublié au bout de 7 jours.
+4) DM impossible (compte fermé aux messages…) -> réponse sous le commentaire « écris-moi en DM » ;
+   dès qu'il écrit en DM, il reçoit le guide + la relance.
 
 Le script tourne en boucle (vérification toutes les 15 s) pendant ~5 h 45, puis GitHub le relance.
 L'état (qui a été contacté) est rangé dans Dropbox /ROBOT_CTA/etat.json, pas sur GitHub (dépôt public).
@@ -127,11 +129,12 @@ class Robot:
         self.traites = set(self.state.get("traites", []))
         self.personnes = set(self.state.get("personnes", []))
         self.attente = self.state.get("attente", {})
+        self.echecs = set(self.state.get("echecs", []))   # commentaires où le DM était impossible
         self.convs = {}            # pseudo -> {"id", "miens": [...], "leurs": [(date, texte)]}
         self.nb_comments = {}      # post -> nombre de commentaires déjà traités
         self.envois = []           # horodatages des questions (limite par minute)
         self.sans_lien = set()
-        self.compte = {"questions": [], "guides": []}
+        self.compte = {"questions": [], "guides": [], "echecs": []}
         self.change = False
 
     def lire_dm(self, pages):
@@ -196,16 +199,18 @@ class Robot:
         for c in comments:
             cid = c["id"]
             user = (c.get("username") or c.get("from", {}).get("username", "")).lower()
-            if cid in self.traites or user == MOI or str(c.get("from", {}).get("id")) == IG_ID:
+            if user == MOI or str(c.get("from", {}).get("id")) == IG_ID:
                 continue
             if not contient(c.get("text", ""), nom_cta):
+                continue
+            qui = f"{user}|{cle}"
+            if cid in self.traites and (qui in self.personnes or cid in self.echecs):
                 continue
             reps = c.get("replies", {}).get("data", [])
             deja_public = any((r.get("username") or r.get("from", {}).get("username", "")).lower() == MOI
                               for r in reps)
             deja_dm = any(any(norm(t) in norm(txt) for t in cfg.get("deja_envoye_si", []))
                           for txt in self.convs.get(user, {}).get("miens", []))
-            qui = f"{user}|{cle}"
             if deja_public or deja_dm or qui in self.personnes:
                 self.traites.add(cid); self.personnes.add(qui); self.change = True; continue
             if (now() - date(c["timestamp"])).days >= 7:
@@ -229,8 +234,23 @@ class Robot:
                     log("Réponse publique KO", user, e)
                 time.sleep(random.uniform(*PAUSE))
             except Exception as e:
-                self.traites.add(cid); self.change = True   # on ne réessaie pas en boucle
-                log("Question KO", user, e)
+                err = str(e)
+                if any(k in err for k in ('"code":4,', '"code":32,', '"code":613,', "rate limit", "Rate limit")):
+                    log("Limite Instagram atteinte, pause", err[:200])
+                    self.envois = [time.time()] * MAX_PAR_MINUTE   # on attend la minute suivante
+                    complet = False; continue
+                # DM impossible (compte qui bloque les messages, etc.) -> on lui dit de nous écrire
+                log("DM impossible pour", user, err[:200])
+                self.traites.add(cid); self.echecs.add(cid); self.personnes.add(qui)
+                self.attente[qui] = {"t": now().strftime("%Y-%m-%dT%H:%M:%S%z"), "mode": "dm"}
+                self.change = True
+                self.compte["echecs"].append("@" + user)
+                try:
+                    post(f"{cid}/replies", message=cfg.get("dm_impossible",
+                         "J'arrive pas à t'envoyer le guide en DM 😕 Écris-moi en DM et je te l'envoie direct !"))
+                except Exception as e2:
+                    log("Réponse publique KO", user, e2)
+                time.sleep(random.uniform(*PAUSE))
         return complet
 
     def tour(self, pages_dm=1):
@@ -253,19 +273,21 @@ class Robot:
                 self.nb_comments[m["id"]] = nb
         if self.change:
             self.state.update(traites=sorted(self.traites)[-5000:], personnes=sorted(self.personnes),
-                              attente=self.attente)
+                              attente=self.attente, echecs=sorted(self.echecs)[-5000:])
             sauver_etat(self.state); self.change = False
 
     def recap(self, titre):
-        q, g = self.compte["questions"], self.compte["guides"]
-        if not (q or g):
+        q, g, x = self.compte["questions"], self.compte["guides"], self.compte["echecs"]
+        if not (q or g or x):
             return
         msg = (f"{titre}\n💬 questions envoyées : {len(q)}\n📩 guides envoyés : {len(g)}\n"
+               f"🚫 DM impossible (invités à t'écrire) : {len(x)}\n"
                f"⏳ en attente de réponse : {len(self.attente)}")
+        if x: msg += "\n\nDM impossible : " + ", ".join(x[:50])
         if g: msg += "\n\nGuide envoyé à : " + ", ".join(g[:50])
         if q: msg += "\n\nQuestion envoyée à : " + ", ".join(q[:50])
         tg(msg)
-        self.compte = {"questions": [], "guides": []}
+        self.compte = {"questions": [], "guides": [], "echecs": []}
 
 def main():
     try:
