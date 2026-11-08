@@ -212,6 +212,11 @@ class Robot:
             deja_dm = any(any(norm(t) in norm(txt) for t in cfg.get("deja_envoye_si", []))
                           for txt in self.convs.get(user, {}).get("miens", []))
             if deja_public or deja_dm or qui in self.personnes:
+                miens = self.convs.get(user, {}).get("miens", [])
+                question_sans_guide = (any(norm("Je te l'envoie") in norm(t) for t in miens)
+                                       and not any(cfg["lien"][:40] in t for t in miens))
+                if question_sans_guide and qui not in self.attente and (now() - date(c["timestamp"])).days < 7:
+                    self.attente[qui] = {"t": c["timestamp"]}   # question déjà posée, on attend sa réponse
                 self.traites.add(cid); self.personnes.add(qui); self.change = True; continue
             if (now() - date(c["timestamp"])).days >= 7:
                 self.traites.add(cid); self.change = True; continue
@@ -228,6 +233,7 @@ class Robot:
                 self.change = True
                 self.compte["questions"].append("@" + user)
                 log("Question envoyée à", user)
+                self.sauver()
                 try:
                     post(f"{cid}/replies", message=random.choice(self.reponses))
                 except Exception as e:
@@ -271,6 +277,9 @@ class Robot:
             nom_cta, cfg = self.ctas[norm(mot)]
             if self.traiter_commentaires(m, nom_cta, cfg):
                 self.nb_comments[m["id"]] = nb
+        self.sauver()
+
+    def sauver(self):
         if self.change:
             self.state.update(traites=sorted(self.traites)[-5000:], personnes=sorted(self.personnes),
                               attente=self.attente, echecs=sorted(self.echecs)[-5000:])
