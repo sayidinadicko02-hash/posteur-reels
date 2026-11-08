@@ -333,7 +333,7 @@ QUESTION = "Salut {prenom}, dis-moi, t'as un business ou t'explores juste ?"
 def relancer_sans_question(r):
     """Une seule fois : ceux à qui tu as envoyé le guide (à la main ou par le robot) sans leur poser la question.
     Instagram n'autorise un message que si la personne t'a écrit dans les dernières 24 h."""
-    r.lire_dm(10)
+    r.lire_dm(30)
     deja = set(r.state.get("relance_faite", []))
     liens = [v["lien"][:40] for _, v in r.ctas.values() if v.get("lien")]
     a_faire, hors_delai = [], []
