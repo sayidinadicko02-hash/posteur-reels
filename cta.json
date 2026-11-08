@@ -1,19 +1,27 @@
 {
   "IDÉE": {
     "lien": "https://www.dropbox.com/scl/fi/cp25u1yregz0df17yn836/Kit_demarrage_IDEE.pdf?rlkey=qxxuzkbos0au0oit0ihkitsom&st=38yxl8qx&dl=0",
-    "message": "Salut ! 🙌\nJ'ai vu que t'avais commenté « IDÉE » sur mon post.\n\nVoici le guide pour tester ton idée de business avec 11 experts IA, gratuitement 👇\n{lien}\n\nDis-moi, t'as déjà un business ou t'aimerais te lancer ?",
-    "deja_envoye_si": ["cp25u1yregz0df17yn836", "IDÉE", "le guide"]
+    "accroche": "Salut ! 🙌\nJ'ai vu que t'avais commenté « IDÉE » sur mon post.\n\nJ'ai préparé un guide pour tester ton idée de business avec 11 experts IA, gratuitement.\n\nJe te l'envoie ?",
+    "message": "Voici le guide 👇\n{lien}\n\nDis-moi, t'as déjà un business ou t'aimerais te lancer ?",
+    "deja_envoye_si": [
+      "cp25u1yregz0df17yn836",
+      "IDÉE",
+      "le guide"
+    ]
   },
   "WHATSAPP": {
     "lien": "",
-    "message": "Salut ! 🙌\nJ'ai vu que t'avais commenté « WHATSAPP » sur mon post.\n\nVoici le modèle de l'agent WhatsApp 👇\n{lien}\n\nDis-moi, t'as déjà un business ou t'aimerais te lancer ?",
-    "deja_envoye_si": ["WHATSAPP"]
+    "accroche": "Salut ! 🙌\nJ'ai vu que t'avais commenté « WHATSAPP » sur mon post.\n\nJ'ai le modèle de l'agent WhatsApp prêt pour toi.\n\nJe te l'envoie ?",
+    "message": "Voici le modèle 👇\n{lien}\n\nDis-moi, t'as déjà un business ou t'aimerais te lancer ?",
+    "deja_envoye_si": [
+      "WHATSAPP"
+    ]
   },
   "_reponses_publiques": [
-    "C'est envoyé en DM 📩",
+    "Je t'ai écrit en DM 📩",
     "Regarde tes messages 🙌",
-    "Envoyé ! Dis-moi ce que t'en penses 🔥",
-    "C'est dans tes DM 💡",
-    "Je t'ai envoyé ça en privé 📩"
+    "Je t'ai envoyé un message 🔥",
+    "Check tes DM 💡",
+    "Je t'ai répondu en privé 📩"
   ]
 }
