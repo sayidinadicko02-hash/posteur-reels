@@ -16,7 +16,8 @@ Mode test (TEST=1) : n'envoie rien, liste seulement ce qui serait fait.
 import os, re, json, time, random, datetime, unicodedata, subprocess
 import requests
 
-IG = "https://graph.instagram.com/v26.0"
+IG = "https://graph.facebook.com/v26.0"   # clé « connexion unifiée » (EAB…)
+IG_ID = "17841415914105749"               # id Instagram de @sayidina.automatise
 STATE_FILE = "cta_state.json"
 CONFIG_FILE = "cta.json"
 JOURS_POSTS = 30          # posts publiés il y a moins de 30 jours
@@ -75,6 +76,8 @@ def post(path, **payload):
 # ---------- Jeton ----------
 def renouveler_jeton(state):
     global TOK
+    if not TOK.startswith("IG"):
+        return   # clé unifiée : pas de renouvellement ici, alerte si elle expire
     last = state.get("last_refresh", "")
     if last and (datetime.date.today() - datetime.date.fromisoformat(last)).days < 7:
         return
@@ -111,7 +114,7 @@ def dm_deja_envoyes(ids_moi):
     """Pseudo -> textes de tes messages envoyés (pour ne pas renvoyer un guide déjà envoyé à la main)."""
     envoyes = {}
     try:
-        convs = get_all("me/conversations", limit_pages=10, platform="instagram",
+        convs = get_all(f"{IG_ID}/conversations", limit_pages=10, platform="instagram",
                         fields="participants,messages.limit(25){from,message}")
     except Exception as e:
         log("Lecture des DM impossible :", e)
@@ -133,14 +136,18 @@ def main():
     traites = set(state.get("traites", []))
     renouveler_jeton(state)
 
-    log(f"Jeton : {len(TOK)} caractères, commence par {TOK[:3]!r}")
-    moi = get("me", fields="user_id,username,id")
-    moi_id, moi_nom = str(moi.get("user_id") or moi["id"]), moi["username"].lower()
-    ids_moi = {str(moi.get("user_id", "")), str(moi.get("id", ""))}
+    try:
+        moi = get(IG_ID, fields="id,username")
+    except RuntimeError as e:
+        if "190" in str(e):
+            tg("⚠️ Robot CTA : ta clé Instagram ne marche plus (expirée ?). Génère-en une nouvelle et remplace le secret IG_TOKEN_CTA.")
+        raise
+    moi_nom = moi["username"].lower()
+    ids_moi = {IG_ID}
     log("Compte :", moi_nom)
 
     envoyes = dm_deja_envoyes(ids_moi) or {}
-    medias = get_all("me/media", limit_pages=5, fields="id,caption,timestamp,permalink", limit=50)
+    medias = get_all(f"{IG_ID}/media", limit_pages=5, fields="id,caption,timestamp,permalink", limit=50)
 
     stats = {"envoyes": 0, "deja": 0, "trop_vieux": 0, "erreurs": 0}
     sans_lien, details = set(), []
@@ -184,7 +191,7 @@ def main():
             if TEST:
                 details.append(f"@{user} ({nom_cta})"); stats["envoyes"] += 1; continue
             try:
-                post("me/messages", recipient={"comment_id": cid}, message={"text": texte})
+                post(f"{IG_ID}/messages", recipient={"comment_id": cid}, message={"text": texte})
                 traites.add(cid)
                 stats["envoyes"] += 1
                 details.append(f"@{user} ({nom_cta})")
