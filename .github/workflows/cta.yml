@@ -5,7 +5,7 @@ on:
     - cron: "*/10 * * * *"
   push:
     branches: [main]
-    paths: [cta.py, cta.json, .github/workflows/cta.yml]
+    paths: [cta.py, cta.json, sonde.py, .github/workflows/cta.yml]
   workflow_dispatch:
     inputs:
       test:
@@ -37,7 +37,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TEST: ${{ github.event.inputs.test || (github.event_name == 'push' && '1') || '0' }}
-        run: python cta.py
+        run: python sonde.py; python cta.py
       - name: Sauvegarder l'état
         run: |
           git config user.name "cta-bot"
