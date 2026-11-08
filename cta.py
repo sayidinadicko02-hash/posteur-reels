@@ -328,6 +328,49 @@ class Robot:
         tg(msg)
         self.compte = {"questions": [], "guides": [], "echecs": []}
 
+QUESTION = "Salut {prenom}, dis-moi, t'as un business ou t'explores juste ?"
+
+def relancer_sans_question(r):
+    """Une seule fois : ceux à qui tu as envoyé le guide (à la main ou par le robot) sans leur poser la question.
+    Instagram n'autorise un message que si la personne t'a écrit dans les dernières 24 h."""
+    r.lire_dm(10)
+    deja = set(r.state.get("relance_faite", []))
+    liens = [v["lien"][:40] for _, v in r.ctas.values() if v.get("lien")]
+    a_faire, hors_delai = [], []
+    for user, conv in r.convs.items():
+        if not user or user in deja:
+            continue
+        miens = conv["miens"]
+        a_eu_guide = any(any(l in m for l in liens) or "guide" in m.lower() for m in miens)
+        a_eu_question = any("business" in m.lower() or "te lancer" in m.lower() or "explores" in m.lower() for m in miens)
+        if not a_eu_guide or a_eu_question:
+            continue
+        dates = [date(dt) for dt, _ in conv["leurs"] if dt]
+        if dates and (now() - max(dates)).total_seconds() < 23 * 3600:
+            a_faire.append(user)
+        else:
+            hors_delai.append(user)
+    log(f"Relance : {len(a_faire)} possibles, {len(hors_delai)} hors délai (pas écrit depuis +24 h)")
+    log("A_FAIRE :", ", ".join(a_faire))
+    log("HORS_DELAI :", ", ".join(hors_delai))
+    envoyes = []
+    if not TEST:
+        for user in a_faire:
+            try:
+                post(f"{IG_ID}/messages", recipient={"id": r.convs[user]["id"]},
+                     message={"text": QUESTION.replace("{prenom}", prenom(r.convs[user]["id"], user))})
+                envoyes.append("@" + user); deja.add(user)
+                log("Question envoyée à", user)
+                time.sleep(random.uniform(4, 9))
+            except Exception as e:
+                log("KO", user, str(e)[:200])
+                if '"code":4,' in str(e):
+                    time.sleep(300)
+        r.state["relance_faite"] = sorted(deja); sauver_etat(r.state)
+    tg(("🧪 TEST " if TEST else "🤖 ") + f"Relance « business ou t'explores » : {len(envoyes) if not TEST else len(a_faire)} "
+       + ("à envoyer" if TEST else "envoyées") + f", {len(hors_delai)} impossibles (pas de message de leur part depuis +24 h)"
+       + ("\n\n" + ", ".join(envoyes or ['@'+u for u in a_faire]) if (envoyes or a_faire) else ""))
+
 def main():
     try:
         get(IG_ID, fields="id,username")
@@ -337,6 +380,9 @@ def main():
                "Génère-en une nouvelle et remplace le secret IG_TOKEN_CTA.")
         raise
     r = Robot()
+    if os.environ.get("RELANCE") == "1":
+        relancer_sans_question(r)
+        return
     if os.environ.get("RATTRAPAGE") == "1":
         # Mode « guides seulement » (ManyChat gère les commentaires) :
         # envoie le guide à ceux qui répondent à l'ancienne question, sans jamais poser de nouvelle question.

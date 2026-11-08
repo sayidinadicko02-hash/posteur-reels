@@ -1,0 +1,34 @@
+name: Relance question business
+
+on:
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "1 = test sans rien envoyer"
+        default: "1"
+
+concurrency:
+  group: relance
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - name: Relance
+        env:
+          IG_TOKEN_CTA: ${{ secrets.IG_TOKEN_CTA }}
+          DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
+          DROPBOX_APP_SECRET: ${{ secrets.DROPBOX_APP_SECRET }}
+          DROPBOX_REFRESH_TOKEN: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TEST: ${{ github.event.inputs.test }}
+          RELANCE: "1"
+        run: python cta.py
