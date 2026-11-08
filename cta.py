@@ -152,7 +152,7 @@ class Robot:
     def lire_dm(self, pages):
         try:
             data = get_all(f"{IG_ID}/conversations", limit_pages=pages, platform="instagram",
-                           limit=25 if pages > 1 else 10,
+                           limit=25,
                            fields="participants,messages.limit(15){from,message,created_time}")
         except Exception as e:
             log("Lecture DM KO", e); return
@@ -237,8 +237,8 @@ class Robot:
                 self.traites.add(cid); self.personnes.add(qui); self.change = True; continue
             if (now() - date(c["timestamp"])).days >= 7:
                 self.traites.add(cid); self.change = True; continue
-            if not self.peut_envoyer():
-                complet = False; continue     # on reprendra au tour suivant
+            if not self.peut_envoyer() or USAGE["pct"] >= 60:
+                complet = False; continue     # quota : on garde de la marge pour envoyer les guides en priorité
             if TEST:
                 log("[test] question pour", user); self.personnes.add(qui)
                 self.compte["questions"].append("@" + user); continue
@@ -335,7 +335,7 @@ def main():
     if r.sans_lien and r.state.get("alerte_sans_lien") != sorted(r.sans_lien):
         r.state["alerte_sans_lien"] = sorted(r.sans_lien); sauver_etat(r.state)
         tg("⚠️ Robot CTA : mots-clés sans lien dans cta.json : " + ", ".join(sorted(r.sans_lien)))
-    debut, dernier_recap, dernier_media = time.time(), time.time(), time.time()
+    debut, dernier_recap, dernier_media, dernier_scan = time.time(), time.time(), time.time(), time.time()
     while time.time() - debut < DUREE_MAX:
         # Quota Meta (app en mode développement ≈ 200 appels/heure) : on ralentit quand il se remplit
         pct = USAGE["pct"]
@@ -343,7 +343,10 @@ def main():
         time.sleep(attente_s)
         try:
             voir_comments = time.time() - dernier_media >= (60 if pct < 40 else 180)
-            r.tour(commentaires=voir_comments)
+            scan = time.time() - dernier_scan >= 600     # toutes les 10 min : relit 100 conversations
+            if scan:
+                dernier_scan = time.time()
+            r.tour(pages_dm=4 if scan else 1, commentaires=voir_comments and pct < 60)
             if voir_comments:
                 dernier_media = time.time()
             log(f"quota utilisé : {USAGE['pct']} %")

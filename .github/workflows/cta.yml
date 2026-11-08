@@ -3,9 +3,6 @@ name: Robot CTA
 on:
   schedule:
     - cron: "*/5 * * * *"      # relance si le robot n'est pas déjà en train de tourner
-  push:
-    branches: [main]
-    paths: [cta.py, cta.json, .github/workflows/cta.yml]
   workflow_dispatch:
     inputs:
       test:
@@ -34,5 +31,5 @@ jobs:
           DROPBOX_REFRESH_TOKEN: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TEST: ${{ github.event.inputs.test || (github.event_name == 'push' && '1') || '0' }}
+          TEST: ${{ github.event.inputs.test || '0' }}
         run: python cta.py
