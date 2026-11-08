@@ -12,7 +12,7 @@ Le texte et le lien de chaque mot-clé sont dans cta.json.
 4) DM impossible (compte fermé aux messages…) -> réponse sous le commentaire « écris-moi en DM » ;
    dès qu'il écrit en DM, il reçoit le guide + la relance.
 
-Le script tourne en boucle (vérification toutes les 15 s) pendant ~5 h 45, puis GitHub le relance.
+Le script tourne en boucle (DM vérifiés toutes les 20 s à 5 min selon le quota Meta) pendant ~5 h 45, puis GitHub le relance.
 L'état (qui a été contacté) est rangé dans Dropbox /ROBOT_CTA/etat.json, pas sur GitHub (dépôt public).
 
 Secrets : IG_TOKEN_CTA, DROPBOX_APP_KEY, DROPBOX_APP_SECRET, DROPBOX_REFRESH_TOKEN,
@@ -52,9 +52,19 @@ def norm(s):
     return "".join(c for c in s if unicodedata.category(c) != "Mn").upper()
 
 # ---------- Instagram ----------
+USAGE = {"pct": 0}
+def noter_usage(r):
+    """Meta renvoie l'usage du quota de l'app (en %) dans l'en-tête x-app-usage."""
+    try:
+        u = json.loads(r.headers.get("x-app-usage", "{}"))
+        USAGE["pct"] = max(u.get("call_count", 0), u.get("total_time", 0), u.get("total_cputime", 0))
+    except Exception:
+        pass
+
 def get(path, **params):
     params["access_token"] = TOK
     r = requests.get(f"{IG}/{path}", params=params, timeout=60)
+    noter_usage(r)
     if r.status_code != 200:
         raise RuntimeError(f"GET {path} -> {r.status_code} {r.text[:300]}")
     return r.json()
@@ -67,6 +77,7 @@ def get_all(path, limit_pages=20, **params):
         if not nxt:
             break
         r = requests.get(nxt, timeout=60)
+        noter_usage(r)
         if r.status_code != 200:
             break
         data = r.json()
@@ -74,6 +85,7 @@ def get_all(path, limit_pages=20, **params):
 
 def post(path, **payload):
     r = requests.post(f"{IG}/{path}", json=payload, headers={"Authorization": f"Bearer {TOK}"}, timeout=60)
+    noter_usage(r)
     if r.status_code != 200:
         raise RuntimeError(f"POST {path} -> {r.status_code} {r.text[:300]}")
     return r.json()
@@ -139,7 +151,8 @@ class Robot:
 
     def lire_dm(self, pages):
         try:
-            data = get_all(f"{IG_ID}/conversations", limit_pages=pages, platform="instagram", limit=25,
+            data = get_all(f"{IG_ID}/conversations", limit_pages=pages, platform="instagram",
+                           limit=25 if pages > 1 else 10,
                            fields="participants,messages.limit(15){from,message,created_time}")
         except Exception as e:
             log("Lecture DM KO", e); return
@@ -167,6 +180,8 @@ class Robot:
                 self.attente.pop(qui); self.change = True; continue
             _, cfg = self.ctas[cle]
             conv, t0 = self.convs.get(user), date(info["t"])
+            if conv and any(cfg["lien"][:40] in t for t in conv["miens"]):
+                self.attente.pop(qui); self.change = True; continue   # tu lui as déjà envoyé le lien toi-même
             if conv and any(dt and date(dt) > t0 for dt, _ in conv["leurs"]):
                 texte = cfg["message"].replace("{lien}", cfg["lien"])
                 if TEST:
@@ -181,7 +196,9 @@ class Robot:
                     log("Guide envoyé à", user)
                     time.sleep(random.uniform(*PAUSE))
                 except Exception as e:
-                    log("Guide KO", user, e)
+                    log("Guide KO", user, str(e)[:200])
+                    if '"code":4,' in str(e):
+                        return   # quota atteint : on réessaiera plus tard
             elif (now() - t0).days >= 7:
                 self.attente.pop(qui); self.change = True
 
@@ -259,9 +276,11 @@ class Robot:
                 time.sleep(random.uniform(*PAUSE))
         return complet
 
-    def tour(self, pages_dm=1):
+    def tour(self, pages_dm=1, commentaires=True):
         self.lire_dm(pages_dm)
         self.envoyer_guides()
+        if not commentaires:
+            self.sauver(); return
         medias = get(f"{IG_ID}/media", fields="id,caption,timestamp,comments_count", limit=50).get("data", [])
         for m in medias:
             if (now() - date(m["timestamp"])).days > JOURS_POSTS:
@@ -316,16 +335,23 @@ def main():
     if r.sans_lien and r.state.get("alerte_sans_lien") != sorted(r.sans_lien):
         r.state["alerte_sans_lien"] = sorted(r.sans_lien); sauver_etat(r.state)
         tg("⚠️ Robot CTA : mots-clés sans lien dans cta.json : " + ", ".join(sorted(r.sans_lien)))
-    debut, dernier_recap = time.time(), time.time()
+    debut, dernier_recap, dernier_media = time.time(), time.time(), time.time()
     while time.time() - debut < DUREE_MAX:
-        time.sleep(INTERVALLE)
+        # Quota Meta (app en mode développement ≈ 200 appels/heure) : on ralentit quand il se remplit
+        pct = USAGE["pct"]
+        attente_s = 20 if pct < 40 else 45 if pct < 70 else 120 if pct < 90 else 300
+        time.sleep(attente_s)
         try:
-            r.tour()
+            voir_comments = time.time() - dernier_media >= (60 if pct < 40 else 180)
+            r.tour(commentaires=voir_comments)
+            if voir_comments:
+                dernier_media = time.time()
+            log(f"quota utilisé : {USAGE['pct']} %")
         except Exception as e:
-            log("Tour KO", e)
-            if "190" in str(e):
+            log("Tour KO", str(e)[:200])
+            if '"code":190' in str(e):
                 tg("⚠️ Robot CTA : ta clé Instagram ne marche plus. Remplace le secret IG_TOKEN_CTA."); raise
-            time.sleep(60)
+            time.sleep(300 if '"code":4,' in str(e) else 60)
         if time.time() - dernier_recap > 3600:
             r.recap("🤖 Robot CTA (dernière heure)"); dernier_recap = time.time()
     r.recap("🤖 Robot CTA")
