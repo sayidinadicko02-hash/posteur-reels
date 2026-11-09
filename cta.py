@@ -248,7 +248,7 @@ class Robot:
                 self.traites.add(cid); self.personnes.add(qui); self.change = True; continue
             if (now() - date(c["timestamp"])).days >= 7:
                 self.traites.add(cid); self.change = True; continue
-            if not self.peut_envoyer() or USAGE["pct"] >= 60:
+            if not self.peut_envoyer() or USAGE["pct"] >= 40:
                 complet = False; continue     # quota : on garde de la marge pour envoyer les guides en priorité
             if TEST:
                 log("[test] question pour", user); self.personnes.add(qui)
@@ -425,10 +425,10 @@ def main():
     while time.time() - debut < DUREE_MAX:
         # Quota Meta (app en mode développement ≈ 200 appels/heure) : on ralentit quand il se remplit
         pct = USAGE["pct"]
-        attente_s = 20 if pct < 40 else 45 if pct < 70 else 120 if pct < 90 else 300
+        attente_s = 20 if pct < 70 else 40 if pct < 90 else 120
         time.sleep(attente_s)
         try:
-            voir_comments = time.time() - dernier_media >= (60 if pct < 40 else 180)
+            voir_comments = time.time() - dernier_media >= (300 if pct < 40 else 900)
             scan = time.time() - dernier_scan >= 600     # toutes les 10 min : relit 100 conversations
             if scan:
                 dernier_scan = time.time()
