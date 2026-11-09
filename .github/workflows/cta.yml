@@ -2,7 +2,7 @@ name: Robot CTA
 
 on:
   schedule:
-    - cron: "*/30 * * * *"     # mode guides seulement : relance s'il reste des gens en attente
+    - cron: "*/30 * * * *"     # relance le robot complet s'il ne tourne plus
   workflow_dispatch:
     inputs:
       test:
@@ -35,5 +35,5 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TEST: ${{ github.event.inputs.test || '0' }}
-          RATTRAPAGE: ${{ github.event.inputs.rattrapage || (github.event_name == 'schedule' && '1') || '0' }}
+          RATTRAPAGE: ${{ github.event.inputs.rattrapage || '0' }}
         run: python cta.py

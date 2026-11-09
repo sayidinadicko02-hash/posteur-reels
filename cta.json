@@ -21,6 +21,17 @@
       "WHATSAPP"
     ]
   },
+  "APPRENDRE": {
+    "lien": "https://www.dropbox.com/scl/fi/a1vickhkh14pr5byckabs/Kit_APPRENDRE_Claude_video.pdf?rlkey=2dbzfbp7o7bstp25turmxb36w&st=v9wxkhh1&dl=0",
+    "accroche": "Salut ! 🙌\nJ'ai vu que t'avais commenté « APPRENDRE » sur mon post.\n\nJ'ai préparé le skill et le prompt exact pour que Claude apprenne n'importe quelle formation en vidéo.\n\nJe te l'envoie ?",
+    "message": "Voici le guide 👇\n{lien}",
+    "relance": "Salut {prenom}, dis-moi, t'as un business ou t'explores juste ?",
+    "dm_impossible": "J'arrive pas à t'envoyer le guide en DM 😕 Écris-moi en DM et je te l'envoie direct !",
+    "deja_envoye_si": [
+      "a1vickhkh14pr5byckabs",
+      "APPRENDRE"
+    ]
+  },
   "_reponses_publiques": [
     "Regarde tes DM 📩",
     "Check tes DM 💡",
