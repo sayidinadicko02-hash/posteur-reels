@@ -1,0 +1,17 @@
+name: debug
+on:
+  push:
+    branches: [debug]
+jobs:
+  d:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install requests && python debug_dm.py
+        env:
+          IG_TOKEN_CTA: ${{ secrets.IG_TOKEN_CTA }}
+          DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
+          DROPBOX_APP_SECRET: ${{ secrets.DROPBOX_APP_SECRET }}
+          DROPBOX_REFRESH_TOKEN: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
+          TELEGRAM_BOT_TOKEN: x
+          TELEGRAM_CHAT_ID: x
