@@ -34,6 +34,7 @@ MAX_PAR_MINUTE = 6        # questions max par minute (anti-blocage Instagram)
 PAUSE = (3, 7)            # secondes entre deux envois
 TEST = os.environ.get("TEST", "0") == "1"
 TOK = os.environ["IG_TOKEN_CTA"].strip()
+CUTOFF = (datetime.datetime.strptime(os.environ["CUTOFF"], "%Y-%m-%dT%H:%M:%S%z") if os.environ.get("CUTOFF") else None)
 
 def log(*a): print(time.strftime("%H:%M:%S"), *a, flush=True)
 def now(): return datetime.datetime.now(datetime.timezone.utc)
@@ -248,6 +249,8 @@ class Robot:
                 self.traites.add(cid); self.personnes.add(qui); self.change = True; continue
             if (now() - date(c["timestamp"])).days >= 7:
                 self.traites.add(cid); self.change = True; continue
+            if CUTOFF and date(c["timestamp"]) > CUTOFF:
+                continue      # commentaire récent : géré par ManyChat
             if not self.peut_envoyer() or USAGE["pct"] >= 40:
                 complet = False; continue     # quota : on garde de la marge pour envoyer les guides en priorité
             if TEST:

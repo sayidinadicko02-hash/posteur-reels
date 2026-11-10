@@ -8,6 +8,9 @@ on:
       test:
         description: "1 = test sans rien envoyer"
         default: "0"
+      cutoff:
+        description: "ne traiter que les commentaires avant cette date (ex 2026-11-09T19:00:00+0000)"
+        default: ""
       rattrapage:
         description: "1 = envoie seulement les guides en retard puis s'arrête"
         default: "0"
@@ -35,5 +38,6 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TEST: ${{ github.event.inputs.test || '0' }}
+          CUTOFF: ${{ github.event.inputs.cutoff || '' }}
           RATTRAPAGE: ${{ github.event.inputs.rattrapage || (github.event_name == 'schedule' && '1') || '0' }}
         run: python cta.py
