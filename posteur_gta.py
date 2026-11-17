@@ -94,6 +94,7 @@ def ig_post(path, tok, payload):
 def publier_reel(tok, video_url, caption):
     ig_id = ig_get("me", tok, fields="user_id,username")
     uid = ig_id.get("user_id") or ig_id["id"]
+    log("Compte Instagram :", ig_id.get("username"))
     cont = ig_post(f"{uid}/media", tok, {"media_type": "REELS", "video_url": video_url,
                                          "caption": caption, "share_to_feed": True})["id"]
     log("Conteneur créé :", cont)
@@ -108,7 +109,9 @@ def publier_reel(tok, video_url, caption):
         raise RuntimeError("Instagram n'a pas fini de traiter la vidéo en 10 minutes")
     media = ig_post(f"{uid}/media_publish", tok, {"creation_id": cont})["id"]
     try:
-        return ig_get(media, tok, fields="permalink").get("permalink", "")
+        pl = ig_get(media, tok, fields="permalink").get("permalink", "")
+        log("Lien :", pl)
+        return pl
     except Exception:
         return ""
 
